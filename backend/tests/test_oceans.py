@@ -1,4 +1,4 @@
-from PortPilot.integration.oceans import get_vessels_due_to_arrive
+from portpilot.integration.oceans import get_vessels_due_to_arrive
 
 """
 Used to test the connection to the OCEAN-X API and print the output
