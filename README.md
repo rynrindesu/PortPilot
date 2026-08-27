@@ -41,6 +41,12 @@ Before setting up PortPilot, install:
 - Access to the required OCEANS-X API
 - An xAI/Grok API key
 
+## Run these commands to create an python environment under PortPilot (root directory)
+python3 -m venv .venv
+source .venv/bin/activate
+cd backend
+pip install -e .
+
 ## Project Structure
 
 ```text
