@@ -36,29 +36,57 @@ Verification
 
 Before setting up PortPilot, install:
 
-- Python 3.13+ 
-- An OCEANS-X account 
-- Access to the required OCEANS-X API
-- An xAI/Grok API key
+- Python 3.13+
+- Access to the team's OCEANS-X API credentials
+- Access to the team's Supabase database credentials
 
-## Run these commands to create an python environment under PortPilot (root directory)
+Copy `.env.example` to `.env` and fill in the credentials provided securely by the project owner.
+
+## Create Python environment and install required dependencies
+
 python3 -m venv .venv
 source .venv/bin/activate
+
 cd backend
+pip install -r requirements.txt
 pip install -e .
 
 ## Project Structure
 
-```text
 PortPilot/
-├── backend/
-│   ├── oceans.py
-│   └── test_oceans.py
-│
-├── frontend/
-│
-├── .env
+├── README.md
 ├── .env.example
 ├── .gitignore
-├── requirements.txt
-└── README.md
+│
+└── backend/
+    ├── pyproject.toml
+    ├── requirements.txt
+    │
+    ├── src/
+    │   └── portpilot/
+    │       ├── main.py
+    │       │
+    │       ├── api/
+    │       │   └── routes/
+    │       │       └── monitoring.py
+    │       │
+    │       ├── integration/
+    │       │   └── oceans.py
+    │       │
+    │       ├── database/
+    │       │   └── postgres.py
+    │       │
+    │       ├── monitoring/
+    │       │   ├── monitor_service.py
+    │       │   ├── seed.py
+    │       │   └── state.py
+    │       │
+    │       └── agent/
+    │           ├── agent.py
+    │           ├── graph.py
+    │           └── tools.py
+    │
+    └── tests/
+        ├── test_monitoring.py
+        ├── test_oceans.py
+        └── test_postgres.py
