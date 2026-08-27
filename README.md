@@ -53,6 +53,7 @@ pip install -e .
 
 ## Project Structure
 
+```text
 PortPilot/
 ├── README.md
 ├── .env.example
@@ -64,24 +65,31 @@ PortPilot/
     │
     ├── src/
     │   └── portpilot/
+    │       ├── __init__.py
     │       ├── main.py
     │       │
     │       ├── api/
+    │       │   ├── __init__.py
     │       │   └── routes/
+    │       │       ├── __init__.py
     │       │       └── monitoring.py
     │       │
     │       ├── integration/
+    │       │   ├── __init__.py
     │       │   └── oceans.py
     │       │
     │       ├── database/
+    │       │   ├── __init__.py
     │       │   └── postgres.py
     │       │
     │       ├── monitoring/
+    │       │   ├── __init__.py
     │       │   ├── monitor_service.py
     │       │   ├── seed.py
     │       │   └── state.py
     │       │
     │       └── agent/
+    │           ├── __init__.py
     │           ├── agent.py
     │           ├── graph.py
     │           └── tools.py
@@ -90,3 +98,4 @@ PortPilot/
         ├── test_monitoring.py
         ├── test_oceans.py
         └── test_postgres.py
+```
