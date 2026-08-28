@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from portpilot.api.routes.monitoring import router
+from PortPilot.api.routes.monitoring import router
 
 app = FastAPI()
 

@@ -1,4 +1,4 @@
-from portpilot.database.postgres import save_vessel_state
+from PortPilot.database.postgres import save_vessel_state
 
 
 def seed_demo_data():

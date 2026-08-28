@@ -1,6 +1,6 @@
-from portpilot.integration.oceans import get_vessels_due_to_arrive
+from PortPilot.integration.oceans import get_vessels_due_to_arrive
 
-from portpilot.database.postgres import (
+from PortPilot.database.postgres import (
     get_vessel_state,
     save_vessel_state,
 )

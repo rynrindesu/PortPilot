@@ -1,6 +1,6 @@
 from datetime import date
 from fastapi import APIRouter
-from portpilot.monitoring.monitor_service import monitor_vessels
+from PortPilot.monitoring.monitor_service import monitor_vessels
 
 router = APIRouter()
 
