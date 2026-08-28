@@ -1,5 +1,5 @@
-┌─────────────────────────────┐
-│        vessel_state          │   (existing — live monitoring feed,
+┌─────────────────────────────--┐
+│        vessel_state           │   (existing — live monitoring feed,
 ├───────────────────────────────┤    overwritten on every poll)
 │ (PK) vessel_name              │
 │ (PK) imo_number               │
@@ -12,7 +12,7 @@
 └───────────────┬───────────────┘
                 │ FK (vessel_name, imo_number)
                 ▼
-┌─────────────────────────────┐
+┌─────────────────────────────--┐
 │      operations_vessels       │   (frozen baseline — only the
 ├───────────────────────────────┤    agent updates this, never
 │ (PK) vessel_name              │    routine polling)
@@ -23,22 +23,22 @@
    ┌────────────┼────────────────┐
    │            │                │
    ▼            ▼                ▼
-┌─────────┐ ┌─────────┐  ┌──────────────────┐
-│ pilot_  │ │  tug_    │  │      berth_        │
+┌─────────┐ ┌─────────-┐  ┌──────────────────---┐
+│ pilot_  │ │  tug_    │  │      berth_         │
 │assignm- │ │assignm-  │  │   allocations       │
 │ ents    │ │ents      │  │                     │
 ├─────────┤ ├──────────┤  ├─────────────────────┤
-│assign-  │ │assign-   │  │ allocation_id (PK)   │
+│assign-  │ │assign-   │  │ allocation_id (PK)  │
 │ ment_id │ │ment_id   │  │                     │
 │  (PK)   │ │ (PK)     │  │                     │
-│vessel_  │ │vessel_   │  │ vessel_name  ┐ FK    │
-│ name ┐FK│ │name  ┐FK │  │ imo_number   ┘       │
-│imo_   ┘ │ │imo_   ┘  │  │ berth_id             │
-│number   │ │number    │  │ start_time           │
-│pilot_id │ │tug_id    │  │ end_time             │
-│start_   │ │start_    │  │ status               │
-│ time    │ │ time     │  │ ('confirmed' |       │
-│end_time │ │end_time  │  │  'pending_review')   │
+│vessel_  │ │vessel_   │  │ vessel_name  ┐ FK   │
+│ name ┐FK│ │name  ┐FK │  │ imo_number   ┘      │
+│imo_   ┘ │ │imo_   ┘  │  │ berth_id            │
+│number   │ │number    │  │ start_time          │
+│pilot_id │ │tug_id    │  │ end_time            │
+│start_   │ │start_    │  │ status              │
+│ time    │ │ time     │  │ ('confirmed' |      │
+│end_time │ │end_time  │  │  'pending_review')  │
 │status   │ │status    │  └─────────────────────┘
 └─────────┘ └──────────┘
 
@@ -47,16 +47,16 @@
                  before/after story + the "verify" step)
                           │
                           ▼
-        ┌───────────────────────────────────┐
-        │          schedule_changes           │
-        ├───────────────────────────────────────┤
-        │ change_id (PK)                        │
+        ┌──────────────────────────────────-----─┐
+        │          schedule_changes              │
+        ├───────────────────────────────────────-┤
+        │ change_id (PK)                         │
         │ vessel_name, imo_number                │
         │ resource_type   ('pilot'|'tug'|'berth')│
         │ resource_id                            │
         │ old_start_time, old_end_time           │
         │ new_start_time, new_end_time           │
-        │ reason              ← agent's rationale │
+        │ reason              ← agent's rationale│
         │ changed_at                             │
         │ changed_by          ('agent' | human)  │
-        └───────────────────────────────────────┘
+        └──────────────────────────────────────-─┘
