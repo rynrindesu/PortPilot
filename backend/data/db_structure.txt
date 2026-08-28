@@ -58,5 +58,4 @@
         │ new_start_time, new_end_time           │
         │ reason              ← agent's rationale│
         │ changed_at                             │
-        │ changed_by          ('agent' | human)  │
         └──────────────────────────────────────-─┘
