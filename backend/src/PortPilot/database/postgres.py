@@ -54,6 +54,42 @@ def get_vessel_state(vessel_name, imo_number):
             }
 
 
+def get_all_vessel_states():
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    vessel_name,
+                    eta,
+                    call_sign,
+                    imo_number,
+                    flag,
+                    location_from,
+                    location_to,
+                    last_updated
+                FROM vessel_state
+                """
+            )
+
+            rows = cursor.fetchall()
+
+            return [
+                {
+                    "vessel_name": row[0],
+                    "eta": row[1],
+                    "call_sign": row[2],
+                    "imo_number": row[3],
+                    "flag": row[4],
+                    "location_from": row[5],
+                    "location_to": row[6],
+                    "last_updated": row[7],
+                }
+                for row in rows
+            ]
+
+
 def save_vessel_state(vessel):
     with get_connection() as connection:
         with connection.cursor() as cursor:
