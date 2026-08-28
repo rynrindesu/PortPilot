@@ -1,4 +1,4 @@
-from portpilot.database.postgres import get_connection
+from PortPilot.database.postgres import get_connection
 
 with get_connection() as connection:
     with connection.cursor() as cursor:

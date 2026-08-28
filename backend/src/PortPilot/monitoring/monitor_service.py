@@ -30,9 +30,10 @@ def monitor_vessels(date):
         print(f"Processing {vessel['vessel_name']}...")
 
         vessel_name = vessel["vessel_name"]
+        imo_number = vessel["imo_number"]
         current_eta = normalize_eta(vessel["eta"])
 
-        previous_state = get_vessel_state(vessel_name)
+        previous_state = get_vessel_state(vessel_name, imo_number)
 
         if previous_state is not None:
             previous_eta = normalize_eta(previous_state["eta"])
@@ -41,6 +42,7 @@ def monitor_vessels(date):
                 changes.append({
                     "event": "ETA_CHANGED",
                     "vessel_name": vessel_name,
+                    "imo_number": imo_number,
                     "previous_eta": previous_eta.isoformat(),
                     "new_eta": current_eta.isoformat(),
                 })

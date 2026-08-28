@@ -15,7 +15,8 @@ def get_connection():
         password=DATABASE_PASSWORD
     )
 
-def get_vessel_state(vessel_name):
+def get_vessel_state(vessel_name, imo_number):
+    """Return the latest live observation for one vessel identity."""
     with get_connection() as connection:
         with connection.cursor() as cursor:
 
@@ -31,9 +32,9 @@ def get_vessel_state(vessel_name):
                     location_to,
                     last_updated
                 FROM vessel_state
-                WHERE vessel_name = %s
+                WHERE vessel_name = %s AND imo_number = %s
                 """,
-                (vessel_name,)
+                (vessel_name, imo_number)
             )
 
             row = cursor.fetchone()
@@ -69,11 +70,10 @@ def save_vessel_state(vessel):
                     location_to
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (vessel_name)
+                ON CONFLICT (vessel_name, imo_number)
                 DO UPDATE SET
                     eta = EXCLUDED.eta,
                     call_sign = EXCLUDED.call_sign,
-                    imo_number = EXCLUDED.imo_number,
                     flag = EXCLUDED.flag,
                     location_from = EXCLUDED.location_from,
                     location_to = EXCLUDED.location_to,
