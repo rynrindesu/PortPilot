@@ -11,15 +11,6 @@
 │    last_updated               │
 └───────────────┬───────────────┘
                 │ FK (vessel_name, imo_number)
-                ▼
-┌─────────────────────────────--┐
-│      operations_vessels       │   (frozen baseline — only the
-├───────────────────────────────┤    agent updates this, never
-│ (PK) vessel_name              │    routine polling)
-│ (PK) imo_number               │
-│    current_eta                │
-└───────────────┬───────────────┘
-                │ FK (vessel_name, imo_number)
    ┌────────────┼────────────────┐
    │            │                │
    ▼            ▼                ▼
@@ -51,7 +42,7 @@
         │          schedule_changes              │
         ├───────────────────────────────────────-┤
         │ change_id (PK)                         │
-        │ vessel_name, imo_number                │
+        │ vessel_name, imo_number (FK)           │
         │ resource_type   ('pilot'|'tug'|'berth')│
         │ resource_id                            │
         │ old_start_time, old_end_time           │
