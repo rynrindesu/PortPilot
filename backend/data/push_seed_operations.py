@@ -16,14 +16,14 @@ def _read_csv(filename):
     with open(DATA_DIR / filename, newline="") as f:
         return list(csv.DictReader(f))
 
-# Upsert every row in one CSV into its matching Supabase table. Safe to
-# re-run - ON CONFLICT (vessel_name, imo_number) updates existing rows
+# Upsert every row in one CSV into its matching Supabase table. 
+# Safe to re-run - ON CONFLICT (vessel_name, imo_number) updates existing rows
 # instead of duplicating them.
-# limit: if set, only push the first N rows from this CSV - useful for
-# testing against a small batch instead of the whole file.
 def push_csv_to_table(filename, table, resource_column, limit=None):
     rows = _read_csv(filename)
 
+    # limit: if set, only push the first N rows from this CSV - useful for
+    # testing against a small batch instead of the whole file.
     if limit is not None:
         rows = rows[:limit]
 
@@ -62,4 +62,4 @@ def push_all(limit=None):
 
 
 if __name__ == "__main__":
-    push_all(limit=5)
+    push_all()
