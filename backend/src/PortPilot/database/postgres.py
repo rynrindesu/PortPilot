@@ -33,6 +33,7 @@ def get_vessel_state(vessel_name, imo_number):
                     flag,
                     location_from,
                     location_to,
+                    status,
                     last_eta_received_at,
                     last_updated
                 FROM vessel_state
@@ -56,8 +57,9 @@ def get_vessel_state(vessel_name, imo_number):
                 "flag": row[6],
                 "location_from": row[7],
                 "location_to": row[8],
-                "last_eta_received_at": row[9],
-                "last_updated": row[10],
+                "status": row[9],
+                "last_eta_received_at": row[10],
+                "last_updated": row[11],
             }
 
 
@@ -251,7 +253,10 @@ def get_vessel_schedule(vessel_name, imo_number):
     if vessel is None:
         return None
 
-    schedule = {"vessel": vessel, "berth": [], "pilot": [], "tug": []}
+    schedule = {
+        "vessel": vessel,
+        "allocations": {"berth": None, "pilot": None, "tug": None},
+    }
     with get_connection() as connection:
         with connection.cursor() as cursor:
             for resource_type, (table, resource_column, id_column) in RESOURCE_TABLES.items():
@@ -265,7 +270,7 @@ def get_vessel_schedule(vessel_name, imo_number):
                     """,
                     (vessel_name, imo_number),
                 )
-                schedule[resource_type] = [
+                assignments = [
                     {
                         "assignment_id": row[0],
                         "resource_id": row[1],
@@ -276,6 +281,13 @@ def get_vessel_schedule(vessel_name, imo_number):
                     }
                     for row in cursor.fetchall()
                 ]
+                if len(assignments) > 1:
+                    raise ValueError(
+                        f"Expected one {resource_type} allocation for "
+                        f"{vessel_name}/{imo_number}, found {len(assignments)}."
+                    )
+                if assignments:
+                    schedule["allocations"][resource_type] = assignments[0]
     return schedule
 
 
