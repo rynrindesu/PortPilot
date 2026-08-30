@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import psycopg
 from dotenv import load_dotenv
@@ -235,3 +236,96 @@ def refresh_vessel_observation(vessel, source="oceans_x"):
                 """,
                 (*_metadata_values(vessel)[:4], source, vessel["vessel_name"], vessel["imo_number"]),
             )
+
+
+RESOURCE_TABLES = {
+    "berth": ("berth_allocations", "berth_id", "allocation_id"),
+    "pilot": ("pilot_assignments", "pilot_id", "assignment_id"),
+    "tug": ("tug_assignments", "tug_id", "assignment_id"),
+}
+
+
+def get_vessel_schedule(vessel_name, imo_number):
+    """Return a vessel's ETA state and its current resource assignments."""
+    vessel = get_vessel_state(vessel_name, imo_number)
+    if vessel is None:
+        return None
+
+    schedule = {"vessel": vessel, "berth": [], "pilot": [], "tug": []}
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for resource_type, (table, resource_column, id_column) in RESOURCE_TABLES.items():
+                cursor.execute(
+                    f"""
+                    SELECT {id_column}, {resource_column}, start_time, end_time,
+                           buffer_minutes, status
+                    FROM {table}
+                    WHERE vessel_name = %s AND imo_number = %s
+                    ORDER BY start_time
+                    """,
+                    (vessel_name, imo_number),
+                )
+                schedule[resource_type] = [
+                    {
+                        "assignment_id": row[0],
+                        "resource_id": row[1],
+                        "start_time": row[2],
+                        "end_time": row[3],
+                        "buffer_minutes": row[4],
+                        "status": row[5],
+                    }
+                    for row in cursor.fetchall()
+                ]
+    return schedule
+
+
+def find_resource_conflicts(
+    resource_type,
+    resource_id,
+    candidate_start,
+    candidate_end,
+    candidate_buffer_minutes=15,
+    exclude_vessel_name=None,
+    exclude_imo_number=None,
+):
+    """Return assignments whose occupied time overlaps a candidate window."""
+    if resource_type not in RESOURCE_TABLES:
+        raise ValueError(f"Unsupported resource type: {resource_type}")
+    if candidate_end <= candidate_start:
+        raise ValueError("candidate_end must be after candidate_start")
+
+    table, resource_column, id_column = RESOURCE_TABLES[resource_type]
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT {id_column}, vessel_name, imo_number, {resource_column},
+                       start_time, end_time, buffer_minutes, status
+                FROM {table}
+                WHERE {resource_column} = %s
+                  AND status <> 'cancelled'
+                  AND start_time < %s + (%s * INTERVAL '1 minute')
+                  AND %s < end_time + (buffer_minutes * INTERVAL '1 minute')
+                ORDER BY start_time
+                """,
+                (resource_id, candidate_end, candidate_buffer_minutes, candidate_start),
+            )
+            rows = cursor.fetchall()
+
+    conflicts = []
+    for row in rows:
+        if row[1] == exclude_vessel_name and row[2] == exclude_imo_number:
+            continue
+        conflicts.append(
+            {
+                "assignment_id": row[0],
+                "vessel_name": row[1],
+                "imo_number": row[2],
+                "resource_id": row[3],
+                "start_time": row[4],
+                "end_time": row[5],
+                "buffer_minutes": row[6],
+                "status": row[7],
+            }
+        )
+    return conflicts
