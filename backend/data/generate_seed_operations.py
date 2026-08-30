@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PortPilot.database.postgres import get_connection, get_all_vessel_states
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "seed_operations"
+OUTPUT_DIR = Path(__file__).resolve().parent / "data_generated"
 
 # Database table and resource ID column for each operation type.
 RESOURCE_TABLES = {
@@ -64,6 +64,53 @@ def _build_pool(kind, size):
     return [f"{prefix}{i:02d}" for i in range(1, size + 1)]
 
 
+def _persist_resource_pools(cursor, pools):
+    """Store every generated resource ID, including resources with no booking."""
+    for resource_type, resource_ids in pools.items():
+        for resource_id in resource_ids:
+            cursor.execute(
+                """
+                INSERT INTO resources (resource_type, resource_id, status)
+                VALUES (%s, %s, 'active')
+                ON CONFLICT (resource_type, resource_id)
+                DO UPDATE SET
+                    status = 'active',
+                    last_updated = NOW()
+                """,
+                (resource_type, resource_id),
+            )
+
+
+def _persist_allocations(cursor, rows):
+    """Upsert the generated allocations directly into the operations tables."""
+    for kind, (table, resource_column) in RESOURCE_TABLES.items():
+        for row in rows[kind]:
+            cursor.execute(
+                f"""
+                INSERT INTO {table} (
+                    vessel_name, imo_number, {resource_column},
+                    start_time, end_time, status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (vessel_name, imo_number)
+                DO UPDATE SET
+                    {resource_column} = EXCLUDED.{resource_column},
+                    start_time = EXCLUDED.start_time,
+                    end_time = EXCLUDED.end_time,
+                    status = EXCLUDED.status,
+                    updated_at = NOW()
+                """,
+                (
+                    row["vessel_name"],
+                    row["imo_number"],
+                    row[resource_column],
+                    row["start_time"],
+                    row["end_time"],
+                    row["status"],
+                ),
+            )
+
+
 # Check for conflicts with existing DB bookings and bookings created in this run.
 def _is_available(cursor, table, resource_column, resource_id, start, end, in_run_bookings):
     cursor.execute(
@@ -101,8 +148,8 @@ def _assign_resource(cursor, table, resource_column, pool, start, end, in_run_bo
     return random.choice(pool), "pending_review"
 
 
-# Generate seed operation schedules while avoiding resource conflicts where possible.
-def generate_operations_csv(limit=None):
+# Generate seed operation schedules and persist them to Supabase.
+def generate_operations(limit=None, export_csv=False):
     vessels = get_all_vessel_states()
     print(f"Found {len(vessels)} vessels in vessel_state.")
 
@@ -164,6 +211,8 @@ def generate_operations_csv(limit=None):
                     f"peak concurrent demand {peak}, pool size {pool_size}"
                 )
 
+            _persist_resource_pools(cursor, pools)
+
             # Second pass: assign a resource to each operation window.
             for kind, (table, resource_column) in RESOURCE_TABLES.items():
                 for vessel_name, imo_number, start, end in operations_to_assign[kind]:
@@ -180,7 +229,14 @@ def generate_operations_csv(limit=None):
                         "status": status,
                     })
 
-    # Write generated assignments to separate CSV files.
+            _persist_allocations(cursor, rows)
+
+    print("Persisted generated resource pools and allocations to Supabase.")
+
+    if not export_csv:
+        return rows
+
+    # Optional debugging snapshot of the generated assignments.
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     for kind, (table, resource_column) in RESOURCE_TABLES.items():
@@ -194,6 +250,13 @@ def generate_operations_csv(limit=None):
 
         print(f"Wrote {len(rows[kind])} rows to {filename}")
 
+    return rows
+
+
+def generate_operations_csv(limit=None):
+    """Backward-compatible CSV-export entry point for debugging only."""
+    return generate_operations(limit=limit, export_csv=True)
+
 
 if __name__ == "__main__":
-    generate_operations_csv()
+    generate_operations()
