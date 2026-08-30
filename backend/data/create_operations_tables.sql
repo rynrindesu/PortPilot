@@ -1,55 +1,108 @@
--- Run once in the Supabase SQL editor.
+-- Run in the Supabase SQL editor for a fresh PortPilot schema.
+-- Every table identifies a vessel by (vessel_name, imo_number).
+
+CREATE TABLE IF NOT EXISTS vessel_state (
+    vessel_name TEXT NOT NULL,
+    imo_number TEXT NOT NULL,
+    call_sign TEXT,
+    flag TEXT,
+    location_from TEXT,
+    location_to TEXT,
+    original_eta TIMESTAMPTZ NOT NULL,
+    previous_eta TIMESTAMPTZ,
+    current_eta TIMESTAMPTZ NOT NULL,
+    eta_source TEXT,
+    eta_confidence NUMERIC(4,3),
+    last_eta_received_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (vessel_name, imo_number)
+);
+
+CREATE TABLE IF NOT EXISTS eta_history (
+    eta_event_id BIGSERIAL PRIMARY KEY,
+    vessel_name TEXT NOT NULL,
+    imo_number TEXT NOT NULL,
+    previous_eta TIMESTAMPTZ,
+    reported_eta TIMESTAMPTZ NOT NULL,
+    source TEXT,
+    confidence NUMERIC(4,3),
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT eta_history_vessel_fk
+        FOREIGN KEY (vessel_name, imo_number)
+        REFERENCES vessel_state (vessel_name, imo_number)
+);
 
 CREATE TABLE IF NOT EXISTS pilot_assignments (
-    assignment_id SERIAL PRIMARY KEY,
+    assignment_id BIGSERIAL PRIMARY KEY,
     vessel_name TEXT NOT NULL,
     imo_number TEXT NOT NULL,
     pilot_id TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ NOT NULL,
+    buffer_minutes INTEGER NOT NULL DEFAULT 15,
     status TEXT NOT NULL DEFAULT 'confirmed',
-    CONSTRAINT pilot_assignments_vessel_fk FOREIGN KEY (vessel_name, imo_number)
-        REFERENCES vessel_state (vessel_name, imo_number)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT pilot_assignments_vessel_fk
+        FOREIGN KEY (vessel_name, imo_number)
+        REFERENCES vessel_state (vessel_name, imo_number),
+    CONSTRAINT pilot_assignment_time_valid CHECK (end_time > start_time)
 );
 
 CREATE TABLE IF NOT EXISTS tug_assignments (
-    assignment_id SERIAL PRIMARY KEY,
+    assignment_id BIGSERIAL PRIMARY KEY,
     vessel_name TEXT NOT NULL,
     imo_number TEXT NOT NULL,
     tug_id TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ NOT NULL,
+    buffer_minutes INTEGER NOT NULL DEFAULT 15,
     status TEXT NOT NULL DEFAULT 'confirmed',
-    CONSTRAINT tug_assignments_vessel_fk FOREIGN KEY (vessel_name, imo_number)
-        REFERENCES vessel_state (vessel_name, imo_number)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT tug_assignments_vessel_fk
+        FOREIGN KEY (vessel_name, imo_number)
+        REFERENCES vessel_state (vessel_name, imo_number),
+    CONSTRAINT tug_assignment_time_valid CHECK (end_time > start_time)
 );
 
 CREATE TABLE IF NOT EXISTS berth_allocations (
-    allocation_id SERIAL PRIMARY KEY,
+    allocation_id BIGSERIAL PRIMARY KEY,
     vessel_name TEXT NOT NULL,
     imo_number TEXT NOT NULL,
     berth_id TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ NOT NULL,
+    buffer_minutes INTEGER NOT NULL DEFAULT 15,
     status TEXT NOT NULL DEFAULT 'confirmed',
-    CONSTRAINT berth_allocations_vessel_fk FOREIGN KEY (vessel_name, imo_number)
-        REFERENCES vessel_state (vessel_name, imo_number)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT berth_allocations_vessel_fk
+        FOREIGN KEY (vessel_name, imo_number)
+        REFERENCES vessel_state (vessel_name, imo_number),
+    CONSTRAINT berth_allocation_time_valid CHECK (end_time > start_time)
 );
 
--- Audit log: one row per reschedule, so a disruption's before/after and the
--- agent's rationale are visible and verifiable, not just the final state.
 CREATE TABLE IF NOT EXISTS schedule_changes (
-    change_id SERIAL PRIMARY KEY,
+    change_id BIGSERIAL PRIMARY KEY,
     vessel_name TEXT NOT NULL,
     imo_number TEXT NOT NULL,
-    resource_type TEXT NOT NULL,  -- 'pilot' | 'tug' | 'berth'
+    resource_type TEXT NOT NULL,
     resource_id TEXT NOT NULL,
     old_start_time TIMESTAMPTZ,
     old_end_time TIMESTAMPTZ,
     new_start_time TIMESTAMPTZ,
     new_end_time TIMESTAMPTZ,
-    reason TEXT,
+    reason TEXT NOT NULL,
+    decision_score NUMERIC,
+    execution_mode TEXT NOT NULL DEFAULT 'autonomous',
     changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT schedule_changes_vessel_fk FOREIGN KEY (vessel_name, imo_number)
+    CONSTRAINT schedule_changes_vessel_fk
+        FOREIGN KEY (vessel_name, imo_number)
         REFERENCES vessel_state (vessel_name, imo_number)
 );
+
+CREATE INDEX IF NOT EXISTS eta_history_vessel_received_idx
+    ON eta_history (vessel_name, imo_number, received_at DESC);
