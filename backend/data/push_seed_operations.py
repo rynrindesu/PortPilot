@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PortPilot.database.postgres import get_connection
 
-DATA_DIR = Path(__file__).resolve().parent / "seed_operations"
+DATA_DIR = Path(__file__).resolve().parent / "data_generated"
 
 TABLES = {
     "pilot_assignments.csv": ("pilot_assignments", "pilot_id"),

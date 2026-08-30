@@ -22,39 +22,39 @@ begin
   where (vessel_name, imo_number) in (
     select vessel_name, imo_number
     from vessel_state
-    where eta < now()
+    where current_eta < now()
   );
 
   delete from pilot_assignments
   where (vessel_name, imo_number) in (
     select vessel_name, imo_number
     from vessel_state
-    where eta < now()
+    where current_eta < now()
   );
 
   delete from tug_assignments
   where (vessel_name, imo_number) in (
     select vessel_name, imo_number
     from vessel_state
-    where eta < now()
+    where current_eta < now()
   );
 
   delete from berth_allocations
   where (vessel_name, imo_number) in (
     select vessel_name, imo_number
     from vessel_state
-    where eta < now()
+    where current_eta < now()
   );
 
   delete from operations_vessels
   where (vessel_name, imo_number) in (
     select vessel_name, imo_number
     from vessel_state
-    where eta < now()
+    where current_eta < now()
   );
 
   delete from vessel_state
-  where eta < now();
+  where current_eta < now();
 
   get diagnostics deleted_vessel_count = row_count;
   return deleted_vessel_count;

@@ -106,3 +106,15 @@ CREATE TABLE IF NOT EXISTS schedule_changes (
 
 CREATE INDEX IF NOT EXISTS eta_history_vessel_received_idx
     ON eta_history (vessel_name, imo_number, received_at DESC);
+
+ALTER TABLE pilot_assignments
+ADD CONSTRAINT pilot_assignments_vessel_unique
+UNIQUE (vessel_name, imo_number);
+
+ALTER TABLE tug_assignments
+ADD CONSTRAINT tug_assignments_vessel_unique
+UNIQUE (vessel_name, imo_number);
+
+ALTER TABLE berth_allocations
+ADD CONSTRAINT berth_allocations_vessel_unique
+UNIQUE (vessel_name, imo_number);

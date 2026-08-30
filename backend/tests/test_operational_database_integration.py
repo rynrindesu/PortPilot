@@ -36,11 +36,20 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
                 cursor.execute(
                     """
                     INSERT INTO vessel_state
-                        (vessel_name, imo_number, eta, call_sign, flag,
-                         location_from, location_to)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        (vessel_name, imo_number, original_eta, current_eta,
+                         call_sign, flag, location_from, location_to)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (vessel_name, imo_number, baseline_eta, "TST1", "SG", "TEST", "SGSIN"),
+                    (
+                        vessel_name,
+                        imo_number,
+                        baseline_eta,
+                        baseline_eta,
+                        "TST1",
+                        "SG",
+                        "TEST",
+                        "SGSIN",
+                    ),
                 )
                 cursor.execute(
                     """
@@ -79,7 +88,7 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
                 cursor.execute(
                     """
                     UPDATE vessel_state
-                    SET eta = %s, last_updated = NOW()
+                    SET previous_eta = current_eta, current_eta = %s, last_updated = NOW()
                     WHERE vessel_name = %s AND imo_number = %s
                     """,
                     (observed_eta, vessel_name, imo_number),
@@ -87,12 +96,15 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
 
                 cursor.execute(
                     """
-                    SELECT eta FROM vessel_state
+                    SELECT original_eta, previous_eta, current_eta FROM vessel_state
                     WHERE vessel_name = %s AND imo_number = %s
                     """,
                     (vessel_name, imo_number),
                 )
-                assert cursor.fetchone()[0] == observed_eta
+                original_eta, previous_eta, current_eta = cursor.fetchone()
+                assert original_eta == baseline_eta
+                assert previous_eta == baseline_eta
+                assert current_eta == observed_eta
 
                 cursor.execute(
                     """

@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 
 from PortPilot.database.postgres import (
     get_vessel_state,
-    save_vessel_state,
+    record_eta_change,
+    refresh_vessel_observation,
+    save_new_vessel_observation,
 )
 
 def normalize_eta(value):
@@ -31,26 +33,30 @@ def monitor_vessels(date):
 
         vessel_name = vessel["vessel_name"]
         imo_number = vessel["imo_number"]
-        current_eta = normalize_eta(vessel["eta"])
+        incoming_eta = normalize_eta(vessel["eta"])
 
         previous_state = get_vessel_state(vessel_name, imo_number)
 
-        if previous_state is not None:
-            previous_eta = normalize_eta(previous_state["eta"])
+        if previous_state is None:
+            save_new_vessel_observation(vessel, incoming_eta)
+            continue
 
-            if previous_eta != current_eta:
+        stored_current_eta = normalize_eta(previous_state["current_eta"])
+
+        if incoming_eta != stored_current_eta:
+            persisted_change = record_eta_change(vessel, incoming_eta)
+
+            # A concurrent monitor could have already stored this observation.
+            if persisted_change is not None:
                 changes.append({
                     "event": "ETA_CHANGED",
                     "vessel_name": vessel_name,
                     "imo_number": imo_number,
-                    "previous_eta": previous_eta.isoformat(),
-                    "new_eta": current_eta.isoformat(),
+                    "previous_eta": persisted_change["previous_eta"].isoformat(),
+                    "new_eta": persisted_change["current_eta"].isoformat(),
                 })
-
-        save_vessel_state({
-            **vessel,
-            "eta": current_eta,
-        })
+        else:
+            refresh_vessel_observation(vessel)
 
     print("Monitoring complete.")
     if (len(changes) == 0):

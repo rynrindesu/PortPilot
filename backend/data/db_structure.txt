@@ -3,7 +3,9 @@
 ├───────────────────────────────┤    overwritten on every poll)
 │ (PK) vessel_name              │
 │ (PK) imo_number               │
-│    eta                        │
+│    original_eta               │
+│    previous_eta               │
+│    current_eta                │
 │    call_sign                  │
 │    flag                       │
 │    location_from              │

@@ -122,7 +122,7 @@ def generate_operations_csv(limit=None):
             for vessel in vessels:
                 vessel_name = vessel["vessel_name"]
                 imo_number = vessel["imo_number"]
-                eta = vessel["eta"]
+                eta = vessel["current_eta"]
 
                 for kind, (table, _resource_column) in RESOURCE_TABLES.items():
                     if _vessel_has_schedule(cursor, table, vessel_name, imo_number):
