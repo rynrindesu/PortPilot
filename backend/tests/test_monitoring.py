@@ -2,7 +2,7 @@ from PortPilot.monitoring.monitor_service import monitor_vessels
 
 
 def test_monitoring():
-    changes = monitor_vessels("2026-08-29")
+    changes = monitor_vessels("2026-08-30")
 
     print("\nDetected changes:")
 
