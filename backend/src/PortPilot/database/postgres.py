@@ -247,6 +247,63 @@ RESOURCE_TABLES = {
 }
 
 
+def get_active_resources():
+    """Return every active seeded resource, grouped by resource type."""
+    resources = {resource_type: [] for resource_type in RESOURCE_TABLES}
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT resource_type, resource_id
+                FROM resources
+                WHERE status = 'active'
+                ORDER BY resource_type, resource_id
+                """
+            )
+            for resource_type, resource_id in cursor.fetchall():
+                if resource_type in resources:
+                    resources[resource_type].append(resource_id)
+    return resources
+
+
+def get_allocations_in_window(window_start, window_end):
+    """Return active allocation windows that overlap a planning window."""
+    if window_end <= window_start:
+        raise ValueError("window_end must be after window_start")
+
+    allocations = []
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for resource_type, (table, resource_column, id_column) in RESOURCE_TABLES.items():
+                cursor.execute(
+                    f"""
+                    SELECT {id_column}, vessel_name, imo_number, {resource_column},
+                           start_time, end_time, buffer_minutes, status
+                    FROM {table}
+                    WHERE status <> 'cancelled'
+                      AND start_time < %s
+                      AND end_time + (buffer_minutes * INTERVAL '1 minute') > %s
+                    ORDER BY start_time
+                    """,
+                    (window_end, window_start),
+                )
+                allocations.extend(
+                    {
+                        "resource_type": resource_type,
+                        "assignment_id": row[0],
+                        "vessel_name": row[1],
+                        "imo_number": row[2],
+                        "resource_id": row[3],
+                        "start_time": row[4],
+                        "end_time": row[5],
+                        "buffer_minutes": row[6],
+                        "status": row[7],
+                    }
+                    for row in cursor.fetchall()
+                )
+    return allocations
+
+
 def get_vessel_schedule(vessel_name, imo_number):
     """Return a vessel's ETA state and its current resource assignments."""
     vessel = get_vessel_state(vessel_name, imo_number)
