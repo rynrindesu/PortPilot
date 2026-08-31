@@ -1,9 +1,24 @@
+"""Deterministic scheduling logic for port-call rescheduling.
+
+This module does not use an LLM or modify the database. It validates and
+ranks scheduling candidates generated for a disrupted vessel.
+
+1. Hard-constraint filtering validates candidates against the freeze window,
+   resource conflicts, FCFS rules, and conflicts within the candidate.
+   Replacement allocations may be added for vessels displaced through FCFS.
+
+2. Soft-constraint scoring ranks valid candidates using DEFAULT_PRIORITY,
+   with the best option ranked first.
+"""
+
 from datetime import datetime, timedelta, timezone
 
 from PortPilot.database.postgres import (
     get_vessel_schedule,
     find_resource_conflicts,
     get_active_resources,
+    get_allocations_in_window,
+    get_connection,
 )
 
 # Bookings within this window cannot be automatically rescheduled.
@@ -11,13 +26,24 @@ FREEZE_WINDOW_HOURS = 2
 
 # Soft-constraint ranking order. Earlier criteria have higher priority.
 # Use later when implementing the scoring logic.
+
+# First minimize the number of vessels affected, 
+# then minimize how far schedules are shifted, 
+# then avoid repeatedly changing the same vessels, 
+# and finally, when those are equal, prefer the option 
+# with better schedule compactness by leaving less idle time between resource bookings.
 DEFAULT_PRIORITY = [
     "affected_vessel_count",
-    "downstream_effects",
-    "total_delay",
+    "total_schedule_shift",
     "repeat_changes",
     "resource_utilisation",
 ]
+
+
+# --- Hard-constraint filtering -------------------------------------------
+#
+# Validate candidates against scheduling constraints and separate them
+# into valid and invalid options.
 
 # Check whether the proposed allocation keeps the current booking unchanged.
 # Unchanged bookings are allowed even within the freeze window.
@@ -356,3 +382,149 @@ def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels
         must_reallocate.append(conflict_key)
 
     return None, must_reallocate
+
+
+# --- Soft-constraint scoring -------------------------------------------
+#
+# Each scorer returns a value for one priority criterion.
+# Lower values are better.
+
+# Count the unique vessels changed by this option.
+# Fewer affected vessels are preferred.
+def _affected_vessel_count(option):
+    return len({(v["vessel_name"], v["imo_number"]) for v in option["affected_vessels"]})
+
+
+# Calculate the total schedule shift across all changed allocations.
+# Smaller shifts from the current schedule are preferred.
+def _total_schedule_shift(option):
+    total = timedelta()
+    for change in option["changes"]:
+        # Get the vessel's current schedule for comparison.
+        schedule = get_vessel_schedule(change["vessel_name"], change["imo_number"])
+        
+        if schedule is None:
+            continue
+        
+        for resource_type, allocation in change["allocations"].items():
+            # Get the current allocation for the same resource type.
+            current = schedule["allocations"].get(resource_type)
+            if current is None:
+                continue
+            
+            # Count how far the allocation moves, whether earlier or later.
+            total += abs(allocation["start_time"] - current["start_time"])
+    
+    # Return the total schedule shift in minutes.
+    return total.total_seconds() / 60
+
+
+# Return how many times one vessel's ETA has already been revised.
+def _count_previous_changes(vessel_name, imo_number):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM eta_history WHERE vessel_name = %s AND imo_number = %s",
+                (vessel_name, imo_number),
+            )
+            return cursor.fetchone()[0]
+
+
+# Count previous ETA revisions across all unique vessels affected by the option.
+# Fewer repeat changes are preferred to avoid repeatedly disrupting the same vessels.
+def _repeat_changes(option):
+    vessels = {(change["vessel_name"], change["imo_number"]) for change in option["changes"]}
+    return sum(_count_previous_changes(vessel_name, imo_number) for vessel_name, imo_number in vessels)
+
+
+# How far this candidate's window looks for a neighbouring booking on the
+# same resource when measuring idle time. 
+# Wide enough to catch the next booking in a typical port schedule without scanning the whole day.
+RESOURCE_UTILISATION_WINDOW = timedelta(hours=6)
+
+
+# Measure total idle time between each proposed allocation and the next
+# booking on the same resource. Less idle time means better utilisation.
+def _resource_utilisation(option):
+    # Track existing bookings replaced by this candidate.
+    replaced_vessel_resources = {
+        (change["vessel_name"], change["imo_number"], resource_type)
+        for change in option["changes"]
+        for resource_type in change["allocations"]
+    }
+
+    # Flatten all proposed allocations for comparison with DB bookings.
+    proposed_bookings = [
+        {
+            "resource_type": resource_type,
+            "resource_id": allocation["resource_id"],
+            "vessel_name": change["vessel_name"],
+            "imo_number": change["imo_number"],
+            "start_time": allocation["start_time"],
+        }
+        for change in option["changes"]
+        for resource_type, allocation in change["allocations"].items()
+    ]
+
+    total_idle = timedelta()
+
+    for change in option["changes"]:
+        vessel_key = (change["vessel_name"], change["imo_number"])
+        for resource_type, allocation in change["allocations"].items():
+            occupied_end = allocation["end_time"] + timedelta(minutes=allocation["buffer_minutes"])
+            window_start = allocation["start_time"] - RESOURCE_UTILISATION_WINDOW
+            window_end = occupied_end + RESOURCE_UTILISATION_WINDOW
+
+            # Remove DB bookings replaced by this candidate.
+            db_bookings = [
+                booking
+                for booking in get_allocations_in_window(window_start, window_end)
+                if (booking["vessel_name"], booking["imo_number"], booking["resource_type"])
+                not in replaced_vessel_resources
+            ]
+
+            # Consider proposed bookings after this allocation finishes,
+            # within this allocation's search window.
+            candidate_bookings = [
+                booking for booking in proposed_bookings
+                if occupied_end <= booking["start_time"] <= window_end
+            ]
+
+            next_start = min(
+                (
+                    booking["start_time"]
+                    for booking in db_bookings + candidate_bookings
+                    if booking["resource_type"] == resource_type
+                    and booking["resource_id"] == allocation["resource_id"]
+                    and (booking["vessel_name"], booking["imo_number"]) != vessel_key
+                    and booking["start_time"] >= occupied_end
+                ),
+                default=None,
+            )
+            if next_start is not None:
+                total_idle += next_start - occupied_end
+            else:
+                # No next booking means the full window counts as idle time.
+                total_idle += RESOURCE_UTILISATION_WINDOW
+
+    return total_idle.total_seconds() / 60
+
+
+# Maps each DEFAULT_PRIORITY criterion name to the function that scores it.
+_SCORERS = {
+    "affected_vessel_count": _affected_vessel_count,
+    "total_schedule_shift": _total_schedule_shift,
+    "repeat_changes": _repeat_changes,
+    "resource_utilisation": _resource_utilisation,
+}
+
+
+# Build the score tuple for one option using the priority order.
+# Lower values are better, with earlier criteria taking priority.
+def _score_option(option):
+    return tuple(_SCORERS[criterion](option) for criterion in DEFAULT_PRIORITY)
+
+
+# Rank valid options from best to worst using their score tuples.
+def rank_options(valid_options):
+    return sorted(valid_options, key=_score_option)
