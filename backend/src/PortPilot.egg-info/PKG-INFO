@@ -7,3 +7,4 @@ Requires-Dist: python-dotenv
 Requires-Dist: fastapi
 Requires-Dist: uvicorn
 Requires-Dist: psycopg[binary]
+Requires-Dist: langchain-core

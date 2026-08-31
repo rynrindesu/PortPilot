@@ -7,6 +7,8 @@ src/PortPilot.egg-info/dependency_links.txt
 src/PortPilot.egg-info/top_level.txt
 src/PortPilot/agent/agent.py
 src/PortPilot/agent/graph.py
+src/PortPilot/agent/schedule_option_generator.py
+src/PortPilot/agent/scheduling_rules.py
 src/PortPilot/agent/tools.py
 src/PortPilot/api/routes/monitoring.py
 src/PortPilot/database/postgres.py
@@ -20,7 +22,12 @@ src/portpilot.egg-info/SOURCES.txt
 src/portpilot.egg-info/dependency_links.txt
 src/portpilot.egg-info/requires.txt
 src/portpilot.egg-info/top_level.txt
+tests/test_filter_valid_options.py
+tests/test_get_vessel_schedule_tool.py
 tests/test_monitoring.py
+tests/test_monitoring_eta_state.py
 tests/test_oceans.py
+tests/test_operational_database_integration.py
 tests/test_postgres.py
 tests/test_tables.py
+tests/test_vessel_state.py
