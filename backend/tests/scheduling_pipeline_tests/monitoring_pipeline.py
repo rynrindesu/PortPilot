@@ -16,7 +16,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from PortPilot.agent.schedule_option_generator import generate_schedule_options
-from PortPilot.agent.scheduling_rules import filter_valid_options
+from PortPilot.agent.scheduling_rules import filter_valid_options, rank_options
 from PortPilot.monitoring.monitor_service import monitor_vessels
 
 OUTPUT_DIRECTORY = Path(__file__).resolve().parent / "test_output"
@@ -67,6 +67,7 @@ def main() -> None:
             vessel_name, imo_number, revised_eta
         )
         valid_options, invalid_options = filter_valid_options(generated_options)
+        ranked_options = rank_options(valid_options)
         vessel_reports.append(
             {
                 "vessel_name": vessel_name,
@@ -76,6 +77,7 @@ def main() -> None:
                 "plans_proposed": len(generated_options),
                 "valid_plans": len(valid_options),
                 "invalid_plans": len(invalid_options),
+                "ranked_plans": ranked_options[:3],
                 "validated_plans": valid_options,
                 "rejected_plans": invalid_options,
             }
