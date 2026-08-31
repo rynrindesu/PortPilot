@@ -42,7 +42,7 @@ python tests/scheduling_pipeline_tests/initialize_database.py <date in YYYY-MM-D
 This initialises an empty database with OCEANS-X vessel states, resource master data, and simulated operational allocations.
 
 ```bash
-python tests/scheduling_pipeline_tests/monitoring_pipeline.py <date in YYYY-MM-DD> <n>
+python tests/scheduling_pipeline_tests/monitoring_pipeline.py <n> <date in YYYY-MM-DD> 
 ```
 n is a positive integer identifying the pipeline run. 
 The script appends its report to: run_output_n.txt 
