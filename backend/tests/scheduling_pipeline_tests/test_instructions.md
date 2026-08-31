@@ -34,7 +34,7 @@ Each generated option is validated using `scheduling_rules.py`, including resour
 The output contains valid and invalid schedule options. Invalid options include a reason explaining why they cannot be used. The pipeline does not apply any schedule change to the database.
 
 # Run Instructions 
-Activate your Python virtual environment and run these commands from the `backend` directory.
+Activate your Python virtual environment from `PortPilot` and run these commands from the `backend` directory.
 
 ```bash
 python tests/scheduling_pipeline_tests/initialize_database.py <date in YYYY-MM-DD>
