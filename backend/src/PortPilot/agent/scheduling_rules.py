@@ -56,6 +56,25 @@ def _is_unchanged(current, proposed):
     )
 
 
+# Check whether retained resource timings are still feasible
+# against the vessel's revised ETA.
+def _is_retain_timing_feasible(option):
+    if option["strategy"] != "retain_current_allocation":
+        return True
+
+    target_eta = option["target_eta"]
+    allocations = option["changes"][0]["allocations"]
+
+    if allocations["pilot"]["end_time"] < target_eta:
+        return False
+    if allocations["tug"]["start_time"] < target_eta:
+        return False
+    if allocations["berth"]["start_time"] < target_eta:
+        return False
+
+    return True
+
+
 # Check whether an existing allocation is already in progress or too
 # close to its start time to be automatically reassigned.
 def is_booking_locked(current_allocation, now=None):
@@ -87,7 +106,8 @@ def is_option_available(resource_type, resource_id, start, end, buffer_minutes,
         conflicts, this_original_eta, current_vessel, candidate_vessels, resource_type,
     )
 
-    # A hard FCFS or non-disrupted-vessel conflict makes the option invalid.
+    # A conflict that cannot be resolved under the scheduling rules
+    # makes the option invalid.
     if rejection_reason is not None:
         return "invalid", rejection_reason, []
 
@@ -122,8 +142,8 @@ def _find_internal_conflict(changes):
             for vessel_b, alloc_b in entries[i + 1:]:
                 if _allocations_overlap(alloc_a, alloc_b):
                     return (
-                        f"{vessel_a} and {vessel_b} both propose {resource_type} "
-                        f"{resource_id} at overlapping times within the same candidate"
+                        f"{vessel_a} and {vessel_b} are assigned overlapping times on "
+                        f"{resource_type} {resource_id} within the same candidate."
                     )
     return None
 
@@ -206,6 +226,8 @@ def _find_replacement_allocation(vessel_key, resource_type, changes):
 
 # Validate one complete scheduling candidate.
 #
+# 0. If this is a "retain_current_allocation" option, check its unchanged
+#    pilot/tug/berth times are still feasible against the revised target_eta.
 # For each proposed allocation:
 # 1. Check that the existing booking is not frozen.
 # 2. Check resource conflicts and apply FCFS.
@@ -215,6 +237,11 @@ def _find_replacement_allocation(vessel_key, resource_type, changes):
 # The candidate is valid only when every proposed change and replacement
 # passes all checks.
 def _classify_option(option):
+    if not _is_retain_timing_feasible(option):
+        return "invalid", (
+            "Current allocation timing is no longer feasible with the revised ETA."
+        ), option["changes"]
+
     changes = list(option["changes"])
     # Track replacements by vessel AND resource type.
     # A vessel is only considered covered if the displaced resource itself
@@ -236,7 +263,7 @@ def _classify_option(option):
 
         schedule = get_vessel_schedule(vessel_name, imo_number)
         if schedule is None:
-            return "invalid", f"No existing schedule found for {vessel_name} ({imo_number})", changes
+            return "invalid", f"No existing schedule was found for {vessel_name} ({imo_number}).", changes
 
         # FCFS always compares original ETAs, not revised/proposed ETAs.
         this_original_eta = schedule["vessel"]["original_eta"]
@@ -247,8 +274,8 @@ def _classify_option(option):
             # Freeze rules only block changes to an existing booking.
             if not _is_unchanged(current, allocation) and is_booking_locked(current):
                 return "invalid", (
-                    f"{vessel_name}'s {resource_type} booking starts within "
-                    f"{FREEZE_WINDOW_HOURS}h and cannot be reassigned"
+                    f"{vessel_name}'s {resource_type} booking starts within the "
+                    f"{FREEZE_WINDOW_HOURS}-hour freeze window and cannot be reassigned."
                 ), changes
 
             # Check database conflicts and FCFS eligibility for this allocation.
@@ -269,9 +296,9 @@ def _classify_option(option):
                 replacement = _find_replacement_allocation(displaced_key, resource_type, changes)
                 if replacement is None:
                     return "invalid", (
-                        f"{vessel_name}'s {resource_type} slot displaces "
-                        f"{displaced_key[0]} ({displaced_key[1]}), who has no "
-                        f"available replacement slot"
+                        f"{vessel_name}'s proposed {resource_type} allocation conflicts with "
+                        f"{displaced_key[0]} ({displaced_key[1]}), and no alternative "
+                        f"{resource_type} resource is available for the displaced vessel."
                     ), changes
 
                 # Add the replacement to this candidate so it is also validated.
@@ -320,18 +347,11 @@ def _is_disrupted(vessel):
 
 # Apply FCFS when a proposed allocation conflicts with another vessel.
 #
-# Rules:
-# 1. Ignore the vessel's own existing booking.
-# 2. A vessel without an ETA change cannot be displaced.
-# 3. If both vessels are disrupted, compare their original ETAs.
-# 4. The vessel with the earlier original ETA keeps priority.
-# 5. If the current vessel has priority, the other vessel must have
-#    a replacement for the displaced resource.
+# If both vessels are disrupted, the earlier original ETA has priority.
+# Otherwise, the conflicting vessel may be displaced if it can be
+# reassigned to another resource.
 #
-# Returns:
-# - rejection_reason: why the allocation is blocked, or None
-# - must_reallocate: vessels that are allowed to be displaced but
-#   still need replacement allocations
+# Returns a rejection reason, or vessels that need reallocation.
 def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels, resource_type):
     must_reallocate = []
 
@@ -354,24 +374,15 @@ def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels
 
         other_vessel = other_schedule["vessel"]
 
-        # A vessel without an ETA revision keeps its existing allocation.
-        if not _is_disrupted(other_vessel):
-            return (
-                f"Conflicts with {booking['vessel_name']}'s existing "
-                f"{resource_type} booking, which has no ETA "
-                f"change and cannot be displaced.",
-                [],
-            )
-
-        # Among disrupted vessels, the earlier original ETA has FCFS priority.
-        if other_vessel["original_eta"] < this_original_eta:
+         # Among disrupted vessels, the earlier original ETA has priority.
+        if _is_disrupted(other_vessel) and other_vessel["original_eta"] < this_original_eta:
             return (
                 f"{booking['vessel_name']} has an earlier original ETA and "
                 f"therefore FCFS priority for this {resource_type} slot.",
                 [],
             )
 
-        # The current vessel has FCFS priority over this conflicting vessel.
+        # The current vessel has priority over this conflicting vessel.
 
         # A replacement for this exact resource_type is already included
         # in this same candidate.
@@ -519,12 +530,22 @@ _SCORERS = {
 }
 
 
-# Build the score tuple for one option using the priority order.
+# Calculate an option's scores and build its ranking key.
 # Lower values are better, with earlier criteria taking priority.
 def _score_option(option):
-    return tuple(_SCORERS[criterion](option) for criterion in DEFAULT_PRIORITY)
+    scores = {criterion: _SCORERS[criterion](option) for criterion in DEFAULT_PRIORITY}
+    sort_key = tuple(scores[criterion] for criterion in DEFAULT_PRIORITY)
+    return sort_key, scores
 
 
-# Rank valid options from best to worst using their score tuples.
+# Rank valid options from best to worst and attach their scores.
 def rank_options(valid_options):
-    return sorted(valid_options, key=_score_option)
+    scored = sorted(
+        (( *_score_option(option), option) for option in valid_options),
+        key=lambda item: item[0],
+    )
+
+    return [
+        {**option, "rank": rank, "scores": scores}
+        for rank, (_, scores, option) in enumerate(scored, start=1)
+    ]
