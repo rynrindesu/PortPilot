@@ -286,7 +286,7 @@ def _classify_option(option):
                 current_vessel, candidate_vessels, this_original_eta,
             )
             if status == "invalid":
-                return "invalid", f"{vessel_name}'s {reason}", changes
+                return "invalid", reason, changes
 
             # This allocation displaces other vessels - try to find each one
             # a free replacement slot right now, instead of retrying later.
