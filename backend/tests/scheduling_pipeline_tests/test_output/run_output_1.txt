@@ -1,0 +1,1020 @@
+Title: Output of monitoring pipeline test run 1
+Outcome: 3 ETA changes detected, all 3 had valid plans (output of 3rd vessel not shown because it is too long)
+
+*PS this^ is not how the future test outcome files metadata & summary will be displayed, just for this run 
+
+========================================================================
+ETA change: NEW PARADISE (9398060)
+Previous ETA: 2026-08-31T19:30:00+00:00
+Revised ETA:  2026-08-31T19:15:00+00:00
+Generated 14 option(s): 3 valid, 11 rejected.
+
+VALIDATED PLANS
+[
+  {
+    "option_id": "shift_same_resources",
+    "strategy": "shift_same_resources",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T12",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": []
+  },
+  {
+    "option_id": "alternative_resources_1",
+    "strategy": "alternative_resources",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": []
+  },
+  {
+    "option_id": "alternative_resources_2",
+    "strategy": "alternative_resources",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": []
+  }
+]
+
+REJECTED PLANS
+[
+  {
+    "option_id": "retain_current_allocation",
+    "strategy": "retain_current_allocation",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T19:30:00+00:00",
+            "end_time": "2026-09-01T01:35:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T18:04:18.008438+00:00",
+            "end_time": "2026-08-31T19:30:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T12",
+            "start_time": "2026-08-31T19:30:00+00:00",
+            "end_time": "2026-08-31T20:01:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [],
+    "invalid_reason": "NEW PARADISE's Conflicts with ALKIMOS's existing pilot booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_1",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B03",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T04:02:14.816702+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P06",
+            "start_time": "2026-08-31T22:29:25.656032+00:00",
+            "end_time": "2026-08-31T23:30:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T04",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T00:29:46.026053+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 268,
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "resource_id": "B03",
+        "start_time": "2026-08-31T23:30:00+00:00",
+        "end_time": "2026-09-01T04:02:14.816702+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with APRIL's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_2",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B03",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T04:02:14.816702+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P06",
+            "start_time": "2026-08-31T22:29:25.656032+00:00",
+            "end_time": "2026-08-31T23:30:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T04",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T00:29:46.026053+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 268,
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "resource_id": "B03",
+        "start_time": "2026-08-31T23:30:00+00:00",
+        "end_time": "2026-09-01T04:02:14.816702+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with APRIL's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_3",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B03",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T12",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T04:02:14.816702+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P06",
+            "start_time": "2026-08-31T22:29:25.656032+00:00",
+            "end_time": "2026-08-31T23:30:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T04",
+            "start_time": "2026-08-31T23:30:00+00:00",
+            "end_time": "2026-09-01T00:29:46.026053+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 268,
+        "vessel_name": "APRIL",
+        "imo_number": "9384916",
+        "resource_id": "B03",
+        "start_time": "2026-08-31T23:30:00+00:00",
+        "end_time": "2026-09-01T04:02:14.816702+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with APRIL's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_4",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-09-01T07:21:09.862097+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P08",
+            "start_time": "2026-08-31T19:06:40.804428+00:00",
+            "end_time": "2026-08-31T20:01:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T03",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-08-31T20:56:27.509495+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 233,
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "resource_id": "B05",
+        "start_time": "2026-08-31T20:01:00+00:00",
+        "end_time": "2026-09-01T07:21:09.862097+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with LL DODI's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_5",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-09-01T07:21:09.862097+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P08",
+            "start_time": "2026-08-31T19:06:40.804428+00:00",
+            "end_time": "2026-08-31T20:01:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-08-31T20:56:27.509495+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 233,
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "resource_id": "B05",
+        "start_time": "2026-08-31T20:01:00+00:00",
+        "end_time": "2026-09-01T07:21:09.862097+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with LL DODI's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_6",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T08",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-09-01T07:21:09.862097+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P08",
+            "start_time": "2026-08-31T19:06:40.804428+00:00",
+            "end_time": "2026-08-31T20:01:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-08-31T20:56:27.509495+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 233,
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "resource_id": "B05",
+        "start_time": "2026-08-31T20:01:00+00:00",
+        "end_time": "2026-09-01T07:21:09.862097+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      },
+      {
+        "resource_type": "tug",
+        "assignment_id": 233,
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "resource_id": "T08",
+        "start_time": "2026-08-31T20:01:00+00:00",
+        "end_time": "2026-08-31T20:56:27.509495+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with LL DODI's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_7",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T12",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-09-01T07:21:09.862097+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P08",
+            "start_time": "2026-08-31T19:06:40.804428+00:00",
+            "end_time": "2026-08-31T20:01:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T20:01:00+00:00",
+            "end_time": "2026-08-31T20:56:27.509495+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 233,
+        "vessel_name": "LL DODI",
+        "imo_number": "9954797",
+        "resource_id": "B05",
+        "start_time": "2026-08-31T20:01:00+00:00",
+        "end_time": "2026-09-01T07:21:09.862097+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with LL DODI's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_8",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B08",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T01",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-09-01T01:21:29.463305+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P14",
+            "start_time": "2026-08-31T16:10:32.853941+00:00",
+            "end_time": "2026-08-31T18:00:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T13",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-08-31T18:58:46.618303+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 211,
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "resource_id": "B08",
+        "start_time": "2026-08-31T18:00:00+00:00",
+        "end_time": "2026-09-01T01:21:29.463305+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with STRAITS NOMURA's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_9",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B08",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T05",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-09-01T01:21:29.463305+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P14",
+            "start_time": "2026-08-31T16:10:32.853941+00:00",
+            "end_time": "2026-08-31T18:00:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T13",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-08-31T18:58:46.618303+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 211,
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "resource_id": "B08",
+        "start_time": "2026-08-31T18:00:00+00:00",
+        "end_time": "2026-09-01T01:21:29.463305+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with STRAITS NOMURA's existing berth booking, which has no ETA change and cannot be displaced."
+  },
+  {
+    "option_id": "reallocate_one_vessel_10",
+    "strategy": "reallocate_one_vessel",
+    "target_eta": "2026-08-31T19:15:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060"
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "NEW PARADISE",
+        "imo_number": "9398060",
+        "allocations": {
+          "berth": {
+            "resource_id": "B08",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-09-01T01:20:47.948209+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P07",
+            "start_time": "2026-08-31T17:49:18.008438+00:00",
+            "end_time": "2026-08-31T19:15:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T12",
+            "start_time": "2026-08-31T19:15:00+00:00",
+            "end_time": "2026-08-31T19:46:30.114325+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      },
+      {
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "allocations": {
+          "berth": {
+            "resource_id": "B53",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-09-01T01:21:29.463305+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P14",
+            "start_time": "2026-08-31T16:10:32.853941+00:00",
+            "end_time": "2026-08-31T18:00:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T13",
+            "start_time": "2026-08-31T18:00:00+00:00",
+            "end_time": "2026-08-31T18:58:46.618303+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": [
+      {
+        "resource_type": "berth",
+        "assignment_id": 211,
+        "vessel_name": "STRAITS NOMURA",
+        "imo_number": "9422811",
+        "resource_id": "B08",
+        "start_time": "2026-08-31T18:00:00+00:00",
+        "end_time": "2026-09-01T01:21:29.463305+00:00",
+        "buffer_minutes": 15,
+        "status": "confirmed"
+      }
+    ],
+    "invalid_reason": "NEW PARADISE's Conflicts with STRAITS NOMURA's existing berth booking, which has no ETA change and cannot be displaced."
+  }
+]
+
+========================================================================
+ETA change: MAI YANG (9327736)
+Previous ETA: 2026-08-31T19:45:00+00:00
+Revised ETA:  2026-08-31T19:30:00+00:00
+Generated 1 option(s): 1 valid, 0 rejected.
+
+VALIDATED PLANS
+[
+  {
+    "option_id": "retain_current_allocation",
+    "strategy": "retain_current_allocation",
+    "target_eta": "2026-08-31T19:30:00+00:00",
+    "affected_vessels": [
+      {
+        "vessel_name": "MAI YANG",
+        "imo_number": "9327736"
+      }
+    ],
+    "changes": [
+      {
+        "vessel_name": "MAI YANG",
+        "imo_number": "9327736",
+        "allocations": {
+          "berth": {
+            "resource_id": "B37",
+            "start_time": "2026-08-31T19:45:00+00:00",
+            "end_time": "2026-09-01T02:59:27.975280+00:00",
+            "buffer_minutes": 15
+          },
+          "pilot": {
+            "resource_id": "P01",
+            "start_time": "2026-08-31T17:52:03.653305+00:00",
+            "end_time": "2026-08-31T19:45:00+00:00",
+            "buffer_minutes": 15
+          },
+          "tug": {
+            "resource_id": "T14",
+            "start_time": "2026-08-31T19:45:00+00:00",
+            "end_time": "2026-08-31T20:43:08.600834+00:00",
+            "buffer_minutes": 15
+          }
+        }
+      }
+    ],
+    "resource_conflicts": []
+  }
+]
