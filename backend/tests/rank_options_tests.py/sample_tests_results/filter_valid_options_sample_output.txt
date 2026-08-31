@@ -1,3 +1,5 @@
+# this is just a sample output from previous run
+
 valid:
 [{'affected_vessels': [{'imo_number': '9981348',
                         'vessel_name': 'MAO GANG GUANG ZHOU'}],
