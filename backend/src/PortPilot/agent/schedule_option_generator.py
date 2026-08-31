@@ -15,18 +15,20 @@ from PortPilot.database.postgres import (
 )
 
 
-RESOURCE_TYPES = ("berth", "pilot", "tug")
-FREEZE_WINDOW = timedelta(hours=2)
-PLANNING_LOOKBACK = timedelta(hours=2)
-PLANNING_LOOKAHEAD = timedelta(hours=24)
-MAX_DIRECT_OPTIONS = 20
-MAX_REALLOCATION_OPTIONS = 10
+RESOURCE_TYPES = ("berth", "pilot", "tug")  # Resources managed by the agent 
+FREEZE_WINDOW = timedelta(hours=2)  # Does not reallocate resources of vessels arriving within the 2 hours window
+PLANNING_LOOKBACK = timedelta(hours=2)  # Timeframe to consider when finding schedules 
+PLANNING_LOOKAHEAD = timedelta(hours=24)    
+MAX_DIRECT_OPTIONS = 20 # Limit the number of resources that can be returned 
+MAX_REALLOCATION_OPTIONS = 10   # Limit the number of options that affects other vessel's allocations
 
 
+# Internal helper method generating a consistent identifier for each vessel
 def _vessel_key(vessel_name, imo_number):
     return vessel_name, imo_number
 
 
+# Validates that the current vessel has a valid schedule, returns the resource type which value is NONE
 def _ensure_complete_schedule(schedule):
     if schedule is None:
         raise ValueError("Vessel state was not found.")
@@ -39,6 +41,7 @@ def _ensure_complete_schedule(schedule):
         raise ValueError(f"Vessel is missing allocation(s): {', '.join(missing)}.")
 
 
+# Builds a new plan based on the new ETA, does not account for resource allocation and validity 
 def _build_plan(schedule, target_eta, resource_ids):
     """Preserve seeded operation durations while centring the plan on target ETA."""
     allocations = {}
@@ -60,6 +63,7 @@ def _build_plan(schedule, target_eta, resource_ids):
     return allocations
 
 
+# Returns the vessel's current operational allocation plan
 def _current_plan(schedule):
     return {
         resource_type: {
@@ -72,6 +76,7 @@ def _current_plan(schedule):
     }
 
 
+# Check whether 2 plans overlap and contend for the same resources, including end buffer of 15 minutes
 def _plans_overlap(left, right):
     """Return true if plans contend for any same resource, including buffers."""
     for resource_type in RESOURCE_TYPES:
@@ -90,6 +95,7 @@ def _plans_overlap(left, right):
     return False
 
 
+# Checks whether this plan creates conflicts for other existing vessels
 def _conflicts_for_plan(plan, allocations, ignored_vessels):
     conflicts = []
     for booking in allocations:
@@ -111,6 +117,7 @@ def _conflicts_for_plan(plan, allocations, ignored_vessels):
     return conflicts
 
 
+# Generates a cartesian product of valid combinations of resources - ensures one berth, pilot and tug in each combination
 def _resource_combinations(resources):
     if any(not resources.get(resource_type) for resource_type in RESOURCE_TYPES):
         return []
@@ -172,14 +179,17 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     new_eta = new_eta.astimezone(timezone.utc)
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
 
+    # Fetch schedule of this vessel that is affected by the change in ETA from the database
     affected_schedule = get_vessel_schedule(vessel_name, imo_number)
     _ensure_complete_schedule(affected_schedule)
     affected_key = _vessel_key(vessel_name, imo_number)
+
     resources = get_active_resources()
     window_start = new_eta - PLANNING_LOOKBACK
     window_end = new_eta + PLANNING_LOOKAHEAD
     surrounding_allocations = get_allocations_in_window(window_start, window_end)
 
+    # First option tries to preserve the current resource allocation
     options = [
         _candidate(
             "retain_current_allocation",
@@ -194,9 +204,12 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
         for resource_type in RESOURCE_TYPES
     }
     same_resource_plan = _build_plan(affected_schedule, new_eta, current_resource_ids)
+    
+    # Check whether keeping the same resource allocation causes a conflict with the existing allocations
     same_resource_conflicts = _conflicts_for_plan(
         same_resource_plan, surrounding_allocations, {affected_key}
     )
+    # Accept this allocation if it does not clash with another resource
     if not same_resource_conflicts:
         options.append(
             _candidate(
@@ -214,12 +227,15 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
 
     for resource_ids in _resource_combinations(resources):
         resource_set = tuple(resource_ids[resource_type] for resource_type in RESOURCE_TYPES)
-        if resource_set in seen_resource_sets:
+        if resource_set in seen_resource_sets:  # Only try combintion of resources that is not in used 
             continue
+
+        # Build a plan with the free resource combination and check whether it causes a conflict
         seen_resource_sets.add(resource_set)
         target_plan = _build_plan(affected_schedule, new_eta, resource_ids)
         conflicts = _conflicts_for_plan(target_plan, surrounding_allocations, {affected_key})
 
+        # Append the plan if it passes
         if not conflicts:
             direct_options.append(
                 _candidate(
@@ -232,7 +248,8 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
             if len(direct_options) >= MAX_DIRECT_OPTIONS:
                 break
             continue
-
+        
+        # For each of conflicts it makes sure it can only displace 1 more vessel's schedule
         displaced_keys = {
             _vessel_key(conflict["vessel_name"], conflict["imo_number"])
             for conflict in conflicts
@@ -245,7 +262,7 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
             displaced_schedules[displaced_key] = get_vessel_schedule(*displaced_key)
         displaced_schedule = displaced_schedules[displaced_key]
         try:
-            _ensure_complete_schedule(displaced_schedule)
+           _ensure_complete_schedule(displaced_schedule)
         except ValueError:
             continue
 
