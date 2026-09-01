@@ -63,6 +63,10 @@ def get_ranked_options(vessel_name: str, imo_number: str, new_eta: datetime) -> 
     the scheduling rules remove infeasible candidates, and the remaining
     options are ranked according to the configured priority order. This tool
     only proposes plans; it never changes the database.
+
+    If valid_option_count is 0, invalid_reasons lists why candidates were
+    rejected (e.g. FCFS priority, freeze window) - cite one when calling
+    flag_for_review instead of a generic "no valid option" reason.
     """
     try:
         schedule = read_vessel_schedule(vessel_name, imo_number)
@@ -88,11 +92,27 @@ def get_ranked_options(vessel_name: str, imo_number: str, new_eta: datetime) -> 
                 "generated_option_count": len(generated_options),
                 "valid_option_count": len(valid_options),
                 "invalid_option_count": len(invalid_options),
+                "invalid_reasons": _summarize_invalid_reasons(invalid_options) if not valid_options else [],
                 "options": ranked_options[:3],
             }
         )
     except ValueError as error:
         return _json({"found": True, "valid": False, "message": str(error)})
+
+
+# Keep a short list of unique reasons why scheduling options were rejected.
+# These reasons help explain why a vessel needs human review.
+_MAX_INVALID_REASONS = 5
+
+def _summarize_invalid_reasons(invalid_options):
+    reasons = []
+    for invalid_option in invalid_options:
+        reason = invalid_option["invalid_reason"]
+        if reason not in reasons:
+            reasons.append(reason)
+        if len(reasons) == _MAX_INVALID_REASONS:
+            break
+    return reasons
 
 
 # --- Helpers for reschedule_operations ------------------------------------
@@ -131,6 +151,7 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
     # Every applied schedule change must have a reason for the audit log.
     if not reason or not reason.strip():
         return {"success": False, "option_id": option_id, "message": "A reason is required."}
+    reason = reason.strip()
 
     # Revalidate the chosen option against the latest schedule before applying it.
     try:
@@ -206,11 +227,11 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
                     # These values are also needed for the audit log.
                     cursor.execute(
                         f"SELECT {resource_column}, start_time, end_time, buffer_minutes "
-                        f"FROM {table} WHERE vessel_name = %s AND imo_number = %s",
+                        f"FROM {table} WHERE vessel_name = %s AND imo_number = %s FOR UPDATE",
                         (vessel_name, imo_number),
                     )
                     row = cursor.fetchone()
-                    
+
                     # The option expects an existing allocation to update.
                     if row is None:
                         raise ValueError(
@@ -311,5 +332,102 @@ def reschedule_operations(option: dict, reason: str) -> str:
     return _json(result)
 
 
-TOOLS = [get_vessel_schedule, get_ranked_options, reschedule_operations]
+# --- Helper for flag_for_review -------------------------------------------
+
+# Mark one resource allocation as needing human review and record the reason.
+# This is used when the system cannot resolve the scheduling problem automatically.
+#
+# The helper handles the database update, while flag_for_review() exposes it
+# as an LLM-callable tool.
+def flag_allocation_for_review(resource_type, vessel_name, imo_number, reason):
+    # A reason is required so the escalation can be recorded in the audit log.
+    if not reason or not reason.strip():
+        return {"success": False, "message": "A reason is required."}
+    reason = reason.strip()
+
+    # Make sure the requested resource type is supported.
+    if resource_type not in RESOURCE_TABLES:
+        return {"success": False, "message": f"Unknown resource_type: {resource_type}."}
+
+    table, resource_column, _id_column = RESOURCE_TABLES[resource_type]
+
+    try:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                # Read and lock the current allocation while it is being marked for review.
+                cursor.execute(
+                    f"SELECT {resource_column}, start_time, end_time "
+                    f"FROM {table} WHERE vessel_name = %s AND imo_number = %s FOR UPDATE",
+                    (vessel_name, imo_number),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise ValueError(
+                        f"No existing {resource_type} allocation found for "
+                        f"{vessel_name} ({imo_number})."
+                    )
+                resource_id, start_time, end_time = row
+
+                # Mark the allocation as requiring human review.
+                cursor.execute(
+                    f"UPDATE {table} SET status = 'pending_review', updated_at = NOW() "
+                    f"WHERE vessel_name = %s AND imo_number = %s",
+                    (vessel_name, imo_number),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError(
+                        f"Expected to update one {resource_type} row for "
+                        f"{vessel_name} ({imo_number}), updated {cursor.rowcount}."
+                    )
+
+                # Record the escalation in the audit log.
+                # The times stay unchanged because no rescheduling was performed.
+                cursor.execute(
+                    """
+                    INSERT INTO schedule_changes (
+                        vessel_name, imo_number, resource_type, resource_id,
+                        old_start_time, old_end_time, new_start_time, new_end_time,
+                        reason, decision_score, execution_mode
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        vessel_name, imo_number, resource_type, resource_id,
+                        start_time, end_time, start_time, end_time,
+                        reason, None, "human_review",
+                    ),
+                )
+    except ValueError as error:
+        return {"success": False, "message": f"Failed to flag for review: {error}"}
+    except Exception as error:  # never let an unexpected DB error escape unstructured
+        return {"success": False, "message": f"Unexpected error: {error}"}
+
+    # Return the escalation result.
+    return {
+        "success": True,
+        "outcome": "human_review",
+        "vessel_name": vessel_name,
+        "imo_number": imo_number,
+        "resource_type": resource_type,
+        "resource_id": resource_id,
+        "reason": reason,
+    }
+
+
+@tool
+def flag_for_review(resource_type: str, vessel_name: str, imo_number: str, reason: str) -> str:
+    """Escalate one vessel's resource allocation for human review.
+
+    Use this when get_ranked_options() returns no valid scheduling options
+    for the vessel. Mark the affected resource allocation as 'pending_review'
+    and use an invalid reason returned by get_ranked_options() to explain why
+    human review is required.
+
+    This tool handles one resource_type per call.
+    """
+    result = flag_allocation_for_review(resource_type, vessel_name, imo_number, reason)
+    return _json(result)
+
+
+TOOLS = [get_vessel_schedule, get_ranked_options, reschedule_operations, flag_for_review]
 TOOLS_BY_NAME = {tool_definition.name: tool_definition for tool_definition in TOOLS}

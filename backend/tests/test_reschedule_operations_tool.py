@@ -36,7 +36,7 @@ class _FakeCursor:
 
     def execute(self, sql, params=None):
         kind = sql.strip().split()[0]
-        self.executed.append((kind, params))
+        self.executed.append((kind, sql, params))
         if kind == "SELECT":
             self._last_select = self.select_responses.pop(0)
 
@@ -125,7 +125,7 @@ class ApplyScheduleOptionTests(TestCase):
         self.assertEqual(len(result["changes_applied"]), 3)
         self.assertTrue(fake_connection.committed)
         self.assertFalse(fake_connection.rolledback)
-        kinds = [kind for kind, _ in fake_cursor.executed]
+        kinds = [kind for kind, _, _ in fake_cursor.executed]
         self.assertEqual(kinds, ["SELECT", "SELECT", "UPDATE", "INSERT"] * 3)
 
     def test_failure_partway_through_rolls_back_everything(self):
@@ -217,7 +217,7 @@ class ApplyScheduleOptionTests(TestCase):
         self.assertIn("OTHER VESSEL", result["message"])
         self.assertTrue(fake_connection.rolledback)
         self.assertFalse(fake_connection.committed)
-        kinds = [kind for kind, _ in fake_cursor.executed]
+        kinds = [kind for kind, _, _ in fake_cursor.executed]
         self.assertEqual(kinds, ["SELECT"])  # only the resource lock - no write attempted
 
     def test_insert_receives_correct_audit_data(self):
@@ -245,7 +245,7 @@ class ApplyScheduleOptionTests(TestCase):
             )
 
         self.assertTrue(result["success"])
-        insert_calls = [params for kind, params in fake_cursor.executed if kind == "INSERT"]
+        insert_calls = [params for kind, _, params in fake_cursor.executed if kind == "INSERT"]
         self.assertEqual(len(insert_calls), 1)
         (
             vessel_name, imo_number, resource_type, resource_id,
@@ -264,6 +264,47 @@ class ApplyScheduleOptionTests(TestCase):
         self.assertEqual(reason, "displaced by MAZU 06's reschedule")
         self.assertEqual(decision_score, 2)  # the option's rank
         self.assertEqual(execution_mode, "autonomous")
+
+    def test_reads_old_values_with_row_lock(self):
+        """The old-values SELECT must lock this vessel's allocation row (the
+        same row flag_allocation_for_review() locks), so the two write paths
+        can't interleave and produce a stale audit entry or clobber each
+        other's write."""
+        option = _option("opt_1", [{
+            "vessel_name": "TEST VESSEL A", "imo_number": "1111111",
+            "allocations": {"berth": {"resource_id": "B01", "start_time": T0, "end_time": T0, "buffer_minutes": 15}},
+        }])
+        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15)])
+        fake_connection = _FakeConnection(fake_cursor)
+
+        with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
+             patch("PortPilot.agent.tools.get_connection", return_value=fake_connection), \
+             patch("PortPilot.agent.tools.find_resource_conflicts", return_value=[]):
+            apply_schedule_option(option, reason="test")
+
+        select_sqls = [sql for kind, sql, _ in fake_cursor.executed if kind == "SELECT"]
+        self.assertEqual(len(select_sqls), 2)
+        self.assertIn("FROM resources", select_sqls[0])
+        self.assertIn("FOR UPDATE", select_sqls[0])  # locks the resources-table row for the new resource_id
+        self.assertNotIn("FROM resources", select_sqls[1])
+        self.assertIn("FOR UPDATE", select_sqls[1])  # locks this vessel's own allocation row
+
+    def test_reason_is_stripped_before_storage(self):
+        changes = [{
+            "vessel_name": "TEST VESSEL A", "imo_number": "1111111",
+            "allocations": {"berth": {"resource_id": "B01", "start_time": T0, "end_time": T0, "buffer_minutes": 15}},
+        }]
+        option = _option("opt_1", changes)
+        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15)])
+        fake_connection = _FakeConnection(fake_cursor)
+
+        with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
+             patch("PortPilot.agent.tools.get_connection", return_value=fake_connection), \
+             patch("PortPilot.agent.tools.find_resource_conflicts", return_value=[]):
+            apply_schedule_option(option, reason="  needs review  ")
+
+        insert_params = [params for kind, _, params in fake_cursor.executed if kind == "INSERT"][0]
+        self.assertEqual(insert_params[8], "needs review")
 
     def test_applies_revalidated_changes_not_the_stale_original(self):
         """If filter_valid_options() returns a modified option - e.g. with an
