@@ -1,4 +1,11 @@
-"""LLM-callable tools for PortPilot."""
+"""LLM-callable tools for PortPilot.
+
+Four tools are exposed to the agent:
+- get_vessel_schedule: read one vessel's ETA state and current allocations.
+- get_ranked_options: generate, validate, and rank rescheduling plans for a revised ETA.
+- reschedule_operations: apply a chosen plan's allocation changes atomically.
+- flag_for_review: escalate one resource allocation for human review when no valid plan exists for a vessel.
+"""
 
 import json
 from datetime import datetime
