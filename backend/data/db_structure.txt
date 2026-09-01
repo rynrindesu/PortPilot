@@ -6,38 +6,65 @@
 │    original_eta               │
 │    previous_eta               │
 │    current_eta                │
+│    eta_source                 │
+│    eta_confidence             │
 │    call_sign                  │
 │    flag                       │
 │    location_from              │
 │    location_to                │
+│    status ('active' | ...)    │
+│    created_at                 │
 │    last_updated               │
 └───────────────┬───────────────┘
                 │ FK (vessel_name, imo_number)
-   ┌────────────┼────────────────┐
-   │            │                │
-   ▼            ▼                ▼
-┌─────────┐ ┌─────────-┐  ┌──────────────────---┐
-│ pilot_  │ │  tug_    │  │      berth_         │
-│assignm- │ │assignm-  │  │   allocations       │
-│ ents    │ │ents      │  │                     │
-├─────────┤ ├──────────┤  ├─────────────────────┤
-│assign-  │ │assign-   │  │ allocation_id (PK)  │
-│ ment_id │ │ment_id   │  │                     │
-│  (PK)   │ │ (PK)     │  │                     │
-│vessel_  │ │vessel_   │  │ vessel_name  ┐ FK   │
-│ name ┐FK│ │name  ┐FK │  │ imo_number   ┘      │
-│imo_   ┘ │ │imo_   ┘  │  │ berth_id            │
-│number   │ │number    │  │ start_time          │
-│pilot_id │ │tug_id    │  │ end_time            │
-│start_   │ │start_    │  │ status              │
-│ time    │ │ time     │  │ ('confirmed' |      │
-│end_time │ │end_time  │  │  'pending_review')  │
-│status   │ │status    │  └─────────────────────┘
-└─────────┘ └──────────┘
+   ┌────────────┼────────────────┬───────────────┐
+   │            │                │               │
+   ▼            ▼                ▼               ▼
+┌─────────┐ ┌─────────-┐  ┌──────────────---┐ ┌────────────────---┐
+│ pilot_  │ │  tug_    │  │      berth_     │ │   eta_history     │
+│assignm- │ │assignm-  │  │   allocations   │ │  (append-only log │
+│ ents    │ │ents      │  │                 │ │   of every ETA    │
+├─────────┤ ├──────────┤  ├─────────────────┤ │   revision seen)  │
+│assign-  │ │assign-   │  │allocation_id(PK)│ ├────────────────---┤
+│ ment_id │ │ment_id   │  │                 │ │eta_event_id (PK)  │
+│  (PK)   │ │ (PK)     │  │ vessel_name ┐FK │ │vessel_name  ┐FK   │
+│vessel_  │ │vessel_   │  │ imo_number  ┘   │ │imo_number   ┘     │
+│ name ┐FK│ │name  ┐FK │  │ berth_id        │ │previous_eta       │
+│imo_   ┘ │ │imo_   ┘  │  │ start_time      │ │reported_eta       │
+│number   │ │number    │  │ end_time        │ │source             │
+│pilot_id │ │tug_id    │  │ buffer_minutes  │ │confidence         │
+│start_   │ │start_    │  │ status          │ │received_at        │
+│ time    │ │ time     │  │ ('confirmed' |  │ └────────────────---┘
+│end_time │ │end_time  │  │  'pending_      │
+│buffer_  │ │buffer_   │  │   review')      │
+│ minutes │ │ minutes  │  │ created_at      │
+│status   │ │status    │  │ updated_at      │
+│created_ │ │created_  │  └─────────────────┘
+│ at      │ │ at       │
+│updated_ │ │updated_  │  each of these three ALSO has a
+│ at      │ │ at       │  UNIQUE (vessel_name, imo_number)
+└─────────┘ └──────────┘  constraint — exactly one row per vessel
 
-                (every change to any of the three tables above
-                 also writes one row here, for the demo's
-                 before/after story + the "verify" step)
+┌───────────────────────────────────────────---┐
+│                  resources                   │   independent master list — NOT
+├───────────────────────────────────────────---┤   linked by FK to anything. Referenced
+│ (PK) resource_type ('berth'|'pilot'|'tug')   │   logically (resource_type,
+│ (PK) resource_id                             │   resource_id) from the three
+│    status ('active' | ...)                   │   assignment/allocation tables above.
+│    created_at                                │   This is not an occupancy table —
+│    last_updated                              │   availability is derived from this
+└───────────────────────────────────────────---┘   table together with the allocation
+                                                    tables' time windows. Also the row
+                                                    apply_schedule_option() locks
+                                                    (SELECT ... FOR UPDATE) before
+                                                    writing, to prevent two concurrent
+                                                    operations double-booking the same
+                                                    resource.
+
+                (every change to any of the three allocation
+                 tables above also writes one row here, for
+                 the demo's before/after story + the "verify"
+                 step — see apply_schedule_option() in tools.py)
                           │
                           ▼
         ┌──────────────────────────────────-----─┐
@@ -50,5 +77,9 @@
         │ old_start_time, old_end_time           │
         │ new_start_time, new_end_time           │
         │ reason              ← agent's rationale│
+        │ decision_score      ← chosen option's  │
+        │                        rank (1 = best) │
+        │ execution_mode      (default:          │
+        │                      'autonomous')     │
         │ changed_at                             │
         └──────────────────────────────────────-─┘
