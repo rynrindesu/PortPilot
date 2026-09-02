@@ -17,6 +17,7 @@ Writes (overwrites) run_output_2.txt with the result.
 
 import argparse
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -80,10 +81,17 @@ def main():
         arrival_date = _load_report(source_run_path).get("arrival_date")
 
     vessel_reports = []
+    total_started_at = time.perf_counter()
     for vessel in snapshot["vessel_options"]:
         generated_options = vessel["generated_options"]
 
+        # Timed individually so a slow vessel (e.g. one with many FCFS
+        # conflicts each triggering a replacement-resource search) is
+        # visible on its own, not just buried in the total.
+        vessel_started_at = time.perf_counter()
         valid_options, invalid_options = filter_valid_options(generated_options)
+        vessel_elapsed_seconds = time.perf_counter() - vessel_started_at
+
         vessel_reports.append(
             {
                 "vessel_name": vessel["vessel_name"],
@@ -92,10 +100,12 @@ def main():
                 "plans_proposed": len(generated_options),
                 "valid_plans": len(valid_options),
                 "invalid_plans": len(invalid_options),
+                "filter_valid_options_time_seconds": round(vessel_elapsed_seconds, 3),
                 "validated_plans": valid_options,
                 "rejected_plans": invalid_options,
             }
         )
+    total_elapsed_seconds = time.perf_counter() - total_started_at
 
     report = {
         "title": f"PortPilot Monitoring Pipeline — Run {args.target_run_number} "
@@ -111,6 +121,7 @@ def main():
             "total_plans_proposed": sum(item["plans_proposed"] for item in vessel_reports),
             "total_valid_plans": sum(item["valid_plans"] for item in vessel_reports),
             "total_invalid_plans": sum(item["invalid_plans"] for item in vessel_reports),
+            "total_filter_valid_options_time_seconds": round(total_elapsed_seconds, 3),
         },
         "vessel_plan_summary": [
             {
@@ -118,6 +129,7 @@ def main():
                 for key in (
                     "vessel_name", "imo_number", "revised_eta",
                     "plans_proposed", "valid_plans", "invalid_plans",
+                    "filter_valid_options_time_seconds",
                 )
             }
             for item in vessel_reports
@@ -130,6 +142,7 @@ def main():
 
     print(rendered_report)
     print(f"\nWrote report to {target_path} (replaced, not appended)")
+    print(f"total filter_valid_options() time: {total_elapsed_seconds:.3f}s")
 
 
 if __name__ == "__main__":

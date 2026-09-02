@@ -1,8 +1,10 @@
+import atexit
 import os
 from datetime import datetime
 
 import psycopg
 from dotenv import load_dotenv
+from psycopg_pool import ConnectionPool
 
 load_dotenv()
 
@@ -10,11 +12,33 @@ DATABASE_URL = os.getenv("SUPABASE_DB_URL")
 DATABASE_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD")
 
 
+# Reuse database connections instead of opening a new connection for every query.
+# The pool is created lazily so importing this module does not connect to the database.
+_pool = None
+
+
 def get_connection():
-    return psycopg.connect(
-        DATABASE_URL,
-        password=DATABASE_PASSWORD
-    )
+    global _pool
+    if _pool is None:
+        _pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            kwargs={"password": DATABASE_PASSWORD},
+            open=False,
+        )
+        _pool.open()
+        # Close the connection pool cleanly when the application exits.
+        atexit.register(_pool.close)
+    return _pool.connection()
+
+
+# Previous implementation kept for rollback if connection pooling causes issues.
+# Opens a new database connection on every call.
+
+# def get_connection():
+#     return psycopg.connect(
+#         DATABASE_URL,
+#         password=DATABASE_PASSWORD
+#     )
 
 def get_vessel_state(vessel_name, imo_number):
     """Return the ETA state used by the monitoring service for one vessel."""
