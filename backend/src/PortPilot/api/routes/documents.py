@@ -52,7 +52,7 @@ async def upload_document(
     # 1. Extract text
     # --------------------------------
 
-    text = extract_text_from_pdf(
+    text, extraction_method = extract_text_from_pdf(
         str(file_path)
     )
 

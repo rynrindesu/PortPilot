@@ -8,3 +8,5 @@ python-multipart
 pymupdf
 pydantic
 openai
+pytesseract
+pillow
