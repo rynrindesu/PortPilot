@@ -6,5 +6,6 @@ Requires-Dist: requests
 Requires-Dist: python-dotenv
 Requires-Dist: fastapi
 Requires-Dist: uvicorn
-Requires-Dist: psycopg[binary]
+Requires-Dist: psycopg[binary,pool]
 Requires-Dist: langchain-core
+Requires-Dist: langgraph

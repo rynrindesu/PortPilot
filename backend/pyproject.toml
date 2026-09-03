@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn",
     "psycopg[binary,pool]",
     "langchain-core",
+    "langgraph",
 ]
 
 [tool.setuptools.packages.find]

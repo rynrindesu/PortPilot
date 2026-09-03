@@ -2,5 +2,6 @@ requests
 python-dotenv
 fastapi
 uvicorn
-psycopg[binary]
+psycopg[binary,pool]
 langchain-core
+langgraph
