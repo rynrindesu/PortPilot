@@ -95,25 +95,35 @@ def _plans_overlap(left, right):
     return False
 
 
-# Checks whether this plan creates conflicts for other existing vessels
-def _conflicts_for_plan(plan, allocations, ignored_vessels):
-    conflicts = []
+# Index bookings by (resource_type, resource_id) so _conflicts_for_plan()
+# can look up only the bookings for one specific resource, instead of
+# scanning every booking in the planning window for every candidate plan
+# tried
+def _index_allocations_by_resource(allocations):
+    index = {}
     for booking in allocations:
-        if _vessel_key(booking["vessel_name"], booking["imo_number"]) in ignored_vessels:
-            continue
+        key = (booking["resource_type"], booking["resource_id"])
+        index.setdefault(key, []).append(booking)
+    return index
 
-        candidate = plan[booking["resource_type"]]
-        if candidate["resource_id"] != booking["resource_id"]:
-            continue
 
-        candidate_occupied_end = candidate["end_time"] + timedelta(
-            minutes=candidate["buffer_minutes"]
-        )
-        booking_occupied_end = booking["end_time"] + timedelta(
-            minutes=booking["buffer_minutes"]
-        )
-        if candidate["start_time"] < booking_occupied_end and booking["start_time"] < candidate_occupied_end:
-            conflicts.append(booking)
+# Checks whether this plan creates conflicts for other existing vessels
+def _conflicts_for_plan(plan, allocations_by_resource, ignored_vessels):
+    conflicts = []
+    for resource_type, candidate in plan.items():
+        bookings = allocations_by_resource.get((resource_type, candidate["resource_id"]), [])
+        for booking in bookings:
+            if _vessel_key(booking["vessel_name"], booking["imo_number"]) in ignored_vessels:
+                continue
+
+            candidate_occupied_end = candidate["end_time"] + timedelta(
+                minutes=candidate["buffer_minutes"]
+            )
+            booking_occupied_end = booking["end_time"] + timedelta(
+                minutes=booking["buffer_minutes"]
+            )
+            if candidate["start_time"] < booking_occupied_end and booking["start_time"] < candidate_occupied_end:
+                conflicts.append(booking)
     return conflicts
 
 
@@ -149,19 +159,50 @@ def _change(vessel_name, imo_number, allocations):
     }
 
 
+# Generates resource combinations for a displaced vessel by only changing
+# the resource types that conflict, while keeping non-conflicting resources unchanged.
+def _reallocation_resource_combinations(resources, displaced_schedule, conflicting_resource_types):
+    varying_types = [
+        resource_type for resource_type in RESOURCE_TYPES
+        if resource_type in conflicting_resource_types
+    ]
+    fixed_ids = {
+        resource_type: displaced_schedule["allocations"][resource_type]["resource_id"]
+        for resource_type in RESOURCE_TYPES
+        if resource_type not in conflicting_resource_types
+    }
+
+    if not varying_types:
+        # Nothing actually conflicts - shouldn't normally happen (this is
+        # only called once a conflict was found), but stay safe rather than
+        # search nothing at all.
+        yield dict(fixed_ids)
+        return
+
+    if any(not resources.get(resource_type) for resource_type in varying_types):
+        return
+
+    for combo in product(*(resources[resource_type] for resource_type in varying_types)):
+        resource_ids = dict(fixed_ids)
+        resource_ids.update(zip(varying_types, combo, strict=True))
+        yield resource_ids
+
+
 def _find_reallocation_plan(
     displaced_schedule,
     displaced_key,
     target_plan,
-    allocations,
+    allocations_by_resource,
     resources,
     ignored_vessels,
+    conflicting_resource_types,
 ):
-    """Find a conflict-free replacement plan for one displaced vessel."""
     target_eta = displaced_schedule["vessel"]["current_eta"]
-    for resource_ids in _resource_combinations(resources):
+    for resource_ids in _reallocation_resource_combinations(
+        resources, displaced_schedule, conflicting_resource_types
+    ):
         plan = _build_plan(displaced_schedule, target_eta, resource_ids)
-        conflicts = _conflicts_for_plan(plan, allocations, ignored_vessels | {displaced_key})
+        conflicts = _conflicts_for_plan(plan, allocations_by_resource, ignored_vessels | {displaced_key})
         if not conflicts and not _plans_overlap(plan, target_plan):
             return plan
     return None
@@ -188,6 +229,9 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     window_start = new_eta - PLANNING_LOOKBACK
     window_end = new_eta + PLANNING_LOOKAHEAD
     surrounding_allocations = get_allocations_in_window(window_start, window_end)
+    # Indexed once and reused for every candidate plan checked below - see
+    # _index_allocations_by_resource().
+    allocations_by_resource = _index_allocations_by_resource(surrounding_allocations)
 
     # First option tries to preserve the current resource allocation
     options = [
@@ -207,7 +251,7 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     
     # Check whether keeping the same resource allocation causes a conflict with the existing allocations
     same_resource_conflicts = _conflicts_for_plan(
-        same_resource_plan, surrounding_allocations, {affected_key}
+        same_resource_plan, allocations_by_resource, {affected_key}
     )
     # Accept this allocation if it does not clash with another resource
     if not same_resource_conflicts:
@@ -233,7 +277,7 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
         # Build a plan with the free resource combination and check whether it causes a conflict
         seen_resource_sets.add(resource_set)
         target_plan = _build_plan(affected_schedule, new_eta, resource_ids)
-        conflicts = _conflicts_for_plan(target_plan, surrounding_allocations, {affected_key})
+        conflicts = _conflicts_for_plan(target_plan, allocations_by_resource, {affected_key})
 
         # Append the plan if it passes
         if not conflicts:
@@ -258,6 +302,14 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
             continue
 
         displaced_key = displaced_keys.pop()
+        
+        # Only the resource_type(s) this vessel actually conflicts on need a
+        # new slot - it may share more than one resource_type with the
+        # requesting vessel's candidate, but usually just one.
+        conflicting_resource_types = {
+            conflict["resource_type"] for conflict in conflicts
+            if _vessel_key(conflict["vessel_name"], conflict["imo_number"]) == displaced_key
+        }
         if displaced_key not in displaced_schedules:
             displaced_schedules[displaced_key] = get_vessel_schedule(*displaced_key)
         displaced_schedule = displaced_schedules[displaced_key]
@@ -273,9 +325,10 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
             displaced_schedule,
             displaced_key,
             target_plan,
-            surrounding_allocations,
+            allocations_by_resource,
             resources,
             {affected_key},
+            conflicting_resource_types,
         )
         if displaced_plan is None:
             continue

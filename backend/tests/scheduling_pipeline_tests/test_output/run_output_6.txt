@@ -1,0 +1,1377 @@
+========================================================================================
+{
+  "title": "PortPilot Monitoring Pipeline \u2014 Run 6",
+  "run_number": 6,
+  "executed_at": "2026-09-03T05:17:37.572399+00:00",
+  "arrival_date": "2026-09-03",
+  "outcome": {
+    "eta_changes_detected": 7,
+    "vessels_with_plans": 4,
+    "total_plans_proposed": 12,
+    "total_valid_plans": 4,
+    "total_invalid_plans": 8
+  },
+  "vessel_plan_summary": [
+    {
+      "vessel_name": "DAEHO SUNNY",
+      "imo_number": "9511105",
+      "previous_eta": "2026-09-03T14:30:00+00:00",
+      "revised_eta": "2026-09-03T01:00:00+00:00",
+      "plans_proposed": 1,
+      "valid_plans": 0,
+      "invalid_plans": 1
+    },
+    {
+      "vessel_name": "WAN HAI 357",
+      "imo_number": "9930387",
+      "previous_eta": "2026-09-03T15:30:00+00:00",
+      "revised_eta": "2026-09-03T10:30:00+00:00",
+      "plans_proposed": 3,
+      "valid_plans": 2,
+      "invalid_plans": 1
+    },
+    {
+      "vessel_name": "DAEHO SUNNY",
+      "imo_number": "9511105",
+      "previous_eta": "2026-09-03T01:00:00+00:00",
+      "revised_eta": "2026-09-03T14:30:00+00:00",
+      "plans_proposed": 5,
+      "valid_plans": 0,
+      "invalid_plans": 5
+    },
+    {
+      "vessel_name": "WAN HAI 357",
+      "imo_number": "9930387",
+      "previous_eta": "2026-09-03T10:30:00+00:00",
+      "revised_eta": "2026-09-03T15:30:00+00:00",
+      "plans_proposed": 3,
+      "valid_plans": 2,
+      "invalid_plans": 1
+    }
+  ],
+  "vessel_plans": [
+    {
+      "vessel_name": "DAEHO SUNNY",
+      "imo_number": "9511105",
+      "previous_eta": "2026-09-03T14:30:00+00:00",
+      "revised_eta": "2026-09-03T01:00:00+00:00",
+      "plans_proposed": 1,
+      "valid_plans": 0,
+      "invalid_plans": 1,
+      "ranked_plans": [],
+      "validated_plans": [],
+      "rejected_plans": [
+        {
+          "option_id": "retain_current_allocation",
+          "strategy": "retain_current_allocation",
+          "target_eta": "2026-09-03T01:00:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B67",
+                  "start_time": "2026-09-03T01:00:00+00:00",
+                  "end_time": "2026-09-03T11:55:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P17",
+                  "start_time": "2026-09-02T23:15:04.691357+00:00",
+                  "end_time": "2026-09-03T01:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T08",
+                  "start_time": "2026-09-03T01:00:00+00:00",
+                  "end_time": "2026-09-03T01:38:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [],
+          "invalid_reason": "CE BERMUDA has an unchanged schedule and keeps its berth slot."
+        }
+      ]
+    },
+    {
+      "vessel_name": "WAN HAI 357",
+      "imo_number": "9930387",
+      "previous_eta": "2026-09-03T15:30:00+00:00",
+      "revised_eta": "2026-09-03T10:30:00+00:00",
+      "plans_proposed": 3,
+      "valid_plans": 2,
+      "invalid_plans": 1,
+      "ranked_plans": [
+        {
+          "option_id": "reallocate_one_vessel_1",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T10:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "T06",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T11:02:46.213607+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "rank": 1,
+          "scores": {
+            "affected_vessel_count": 2,
+            "total_schedule_shift": 1620.0,
+            "repeat_changes": 13,
+            "resource_utilisation": 834.5386581833334
+          }
+        },
+        {
+          "option_id": "reallocate_one_vessel_2",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T10:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T11",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "rank": 2,
+          "scores": {
+            "affected_vessel_count": 2,
+            "total_schedule_shift": 1620.0,
+            "repeat_changes": 13,
+            "resource_utilisation": 934.5386581833334
+          }
+        }
+      ],
+      "validated_plans": [
+        {
+          "option_id": "reallocate_one_vessel_1",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T10:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "T06",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T11:02:46.213607+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ]
+        },
+        {
+          "option_id": "reallocate_one_vessel_2",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T10:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T11",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ]
+        }
+      ],
+      "rejected_plans": [
+        {
+          "option_id": "retain_current_allocation",
+          "strategy": "retain_current_allocation",
+          "target_eta": "2026-09-03T10:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B55",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T11",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [],
+          "invalid_reason": "MARAN ENDEAVOUR has an unchanged schedule and keeps its berth slot."
+        }
+      ]
+    },
+    {
+      "vessel_name": "DAEHO SUNNY",
+      "imo_number": "9511105",
+      "previous_eta": "2026-09-03T01:00:00+00:00",
+      "revised_eta": "2026-09-03T14:30:00+00:00",
+      "plans_proposed": 5,
+      "valid_plans": 0,
+      "invalid_plans": 5,
+      "ranked_plans": [],
+      "validated_plans": [],
+      "rejected_plans": [
+        {
+          "option_id": "retain_current_allocation",
+          "strategy": "retain_current_allocation",
+          "target_eta": "2026-09-03T14:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B67",
+                  "start_time": "2026-09-03T01:00:00+00:00",
+                  "end_time": "2026-09-03T11:55:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P17",
+                  "start_time": "2026-09-02T23:15:04.691357+00:00",
+                  "end_time": "2026-09-03T01:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T08",
+                  "start_time": "2026-09-03T01:00:00+00:00",
+                  "end_time": "2026-09-03T01:38:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [],
+          "invalid_reason": "Current allocation timing is no longer feasible with the revised ETA."
+        },
+        {
+          "option_id": "reallocate_one_vessel_1",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T14:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-04T01:25:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P08",
+                  "start_time": "2026-09-03T12:45:04.691357+00:00",
+                  "end_time": "2026-09-03T14:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T07",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-03T15:08:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "invalid_reason": "DAEHO SUNNY's berth booking starts within the 2-hour freeze window and cannot be reassigned."
+        },
+        {
+          "option_id": "reallocate_one_vessel_2",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T14:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B20",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-04T01:25:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P08",
+                  "start_time": "2026-09-03T12:45:04.691357+00:00",
+                  "end_time": "2026-09-03T14:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T08",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-03T15:08:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T04:49:41.523486+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P11",
+                  "start_time": "2026-09-03T18:36:38.177832+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T06",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:46.213607+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 878,
+              "vessel_name": "BRIDGE",
+              "imo_number": "9158587",
+              "resource_id": "B20",
+              "start_time": "2026-09-03T10:30:00+00:00",
+              "end_time": "2026-09-03T19:49:41.523486+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "invalid_reason": "DAEHO SUNNY's berth booking starts within the 2-hour freeze window and cannot be reassigned."
+        },
+        {
+          "option_id": "reallocate_one_vessel_3",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T14:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            },
+            {
+              "vessel_name": "ARTVIN",
+              "imo_number": "9595034"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B26",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-04T01:25:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P08",
+                  "start_time": "2026-09-03T12:45:04.691357+00:00",
+                  "end_time": "2026-09-03T14:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T05",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-03T15:08:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "ARTVIN",
+              "imo_number": "9595034",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T22:00:00+00:00",
+                  "end_time": "2026-09-04T09:45:46.365282+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P03",
+                  "start_time": "2026-09-03T21:25:33.878690+00:00",
+                  "end_time": "2026-09-03T22:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T02",
+                  "start_time": "2026-09-03T22:00:00+00:00",
+                  "end_time": "2026-09-03T22:33:54.190107+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 901,
+              "vessel_name": "ARTVIN",
+              "imo_number": "9595034",
+              "resource_id": "B26",
+              "start_time": "2026-09-03T14:00:00+00:00",
+              "end_time": "2026-09-04T01:45:46.365282+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 901,
+              "vessel_name": "ARTVIN",
+              "imo_number": "9595034",
+              "resource_id": "T05",
+              "start_time": "2026-09-03T14:00:00+00:00",
+              "end_time": "2026-09-03T14:33:54.190107+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "invalid_reason": "DAEHO SUNNY's berth booking starts within the 2-hour freeze window and cannot be reassigned."
+        },
+        {
+          "option_id": "reallocate_one_vessel_4",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T14:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105"
+            },
+            {
+              "vessel_name": "SALERNO EXPRESS",
+              "imo_number": "9439761"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "DAEHO SUNNY",
+              "imo_number": "9511105",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B47",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-04T01:25:53.893056+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P17",
+                  "start_time": "2026-09-03T12:45:04.691357+00:00",
+                  "end_time": "2026-09-03T14:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T13",
+                  "start_time": "2026-09-03T14:30:00+00:00",
+                  "end_time": "2026-09-03T15:08:11.992064+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "SALERNO EXPRESS",
+              "imo_number": "9439761",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-04T04:08:17.328464+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P01",
+                  "start_time": "2026-09-03T16:49:32.119353+00:00",
+                  "end_time": "2026-09-03T18:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-03T18:34:25.221865+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 908,
+              "vessel_name": "SALERNO EXPRESS",
+              "imo_number": "9439761",
+              "resource_id": "B47",
+              "start_time": "2026-09-03T14:30:00+00:00",
+              "end_time": "2026-09-04T00:38:17.328464+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "pilot",
+              "assignment_id": 906,
+              "vessel_name": "SALERNO EXPRESS",
+              "imo_number": "9439761",
+              "resource_id": "P17",
+              "start_time": "2026-09-03T13:19:32.119353+00:00",
+              "end_time": "2026-09-03T14:30:00+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 908,
+              "vessel_name": "SALERNO EXPRESS",
+              "imo_number": "9439761",
+              "resource_id": "T13",
+              "start_time": "2026-09-03T14:30:00+00:00",
+              "end_time": "2026-09-03T15:04:25.221865+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "invalid_reason": "DAEHO SUNNY's berth booking starts within the 2-hour freeze window and cannot be reassigned."
+        }
+      ]
+    },
+    {
+      "vessel_name": "WAN HAI 357",
+      "imo_number": "9930387",
+      "previous_eta": "2026-09-03T10:30:00+00:00",
+      "revised_eta": "2026-09-03T15:30:00+00:00",
+      "plans_proposed": 3,
+      "valid_plans": 2,
+      "invalid_plans": 1,
+      "ranked_plans": [
+        {
+          "option_id": "reallocate_one_vessel_1",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T15:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B32",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-04T02:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P16",
+                  "start_time": "2026-09-03T13:47:48.434151+00:00",
+                  "end_time": "2026-09-03T15:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T03",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-03T16:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-04T03:23:40.470554+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P01",
+                  "start_time": "2026-09-03T17:02:54.210508+00:00",
+                  "end_time": "2026-09-03T18:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-03T18:34:29.707478+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 916,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "B32",
+              "start_time": "2026-09-03T15:00:00+00:00",
+              "end_time": "2026-09-04T00:23:40.470554+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "pilot",
+              "assignment_id": 913,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "P16",
+              "start_time": "2026-09-03T14:02:54.210508+00:00",
+              "end_time": "2026-09-03T15:00:00+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 916,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "T03",
+              "start_time": "2026-09-03T15:00:00+00:00",
+              "end_time": "2026-09-03T15:34:29.707478+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "rank": 1,
+          "scores": {
+            "affected_vessel_count": 2,
+            "total_schedule_shift": 1440.0,
+            "repeat_changes": 12,
+            "resource_utilisation": 1036.1029834333333
+          }
+        },
+        {
+          "option_id": "reallocate_one_vessel_2",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T15:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B57",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-04T02:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P08",
+                  "start_time": "2026-09-03T13:47:48.434151+00:00",
+                  "end_time": "2026-09-03T15:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T04",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-03T16:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T02:37:34.786550+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P01",
+                  "start_time": "2026-09-03T18:39:26.650138+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:42.471931+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 917,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "B57",
+              "start_time": "2026-09-03T16:00:00+00:00",
+              "end_time": "2026-09-03T23:07:34.786550+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "pilot",
+              "assignment_id": 924,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "P08",
+              "start_time": "2026-09-03T15:09:26.650138+00:00",
+              "end_time": "2026-09-03T16:00:00+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 917,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "T04",
+              "start_time": "2026-09-03T16:00:00+00:00",
+              "end_time": "2026-09-03T16:32:42.471931+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ],
+          "rank": 2,
+          "scores": {
+            "affected_vessel_count": 2,
+            "total_schedule_shift": 1530.0,
+            "repeat_changes": 12,
+            "resource_utilisation": 846.4629201833334
+          }
+        }
+      ],
+      "validated_plans": [
+        {
+          "option_id": "reallocate_one_vessel_1",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T15:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B32",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-04T02:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P16",
+                  "start_time": "2026-09-03T13:47:48.434151+00:00",
+                  "end_time": "2026-09-03T15:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T03",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-03T16:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-04T03:23:40.470554+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P01",
+                  "start_time": "2026-09-03T17:02:54.210508+00:00",
+                  "end_time": "2026-09-03T18:00:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T18:00:00+00:00",
+                  "end_time": "2026-09-03T18:34:29.707478+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 916,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "B32",
+              "start_time": "2026-09-03T15:00:00+00:00",
+              "end_time": "2026-09-04T00:23:40.470554+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "pilot",
+              "assignment_id": 913,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "P16",
+              "start_time": "2026-09-03T14:02:54.210508+00:00",
+              "end_time": "2026-09-03T15:00:00+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 916,
+              "vessel_name": "CMA CGM POINTE PERCEE",
+              "imo_number": "9975258",
+              "resource_id": "T03",
+              "start_time": "2026-09-03T15:00:00+00:00",
+              "end_time": "2026-09-03T15:34:29.707478+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ]
+        },
+        {
+          "option_id": "reallocate_one_vessel_2",
+          "strategy": "reallocate_one_vessel",
+          "target_eta": "2026-09-03T15:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            },
+            {
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B57",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-04T02:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P08",
+                  "start_time": "2026-09-03T13:47:48.434151+00:00",
+                  "end_time": "2026-09-03T15:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T04",
+                  "start_time": "2026-09-03T15:30:00+00:00",
+                  "end_time": "2026-09-03T16:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            },
+            {
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B04",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-04T02:37:34.786550+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P01",
+                  "start_time": "2026-09-03T18:39:26.650138+00:00",
+                  "end_time": "2026-09-03T19:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T01",
+                  "start_time": "2026-09-03T19:30:00+00:00",
+                  "end_time": "2026-09-03T20:02:42.471931+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [
+            {
+              "resource_type": "berth",
+              "assignment_id": 917,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "B57",
+              "start_time": "2026-09-03T16:00:00+00:00",
+              "end_time": "2026-09-03T23:07:34.786550+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "pilot",
+              "assignment_id": 924,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "P08",
+              "start_time": "2026-09-03T15:09:26.650138+00:00",
+              "end_time": "2026-09-03T16:00:00+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            },
+            {
+              "resource_type": "tug",
+              "assignment_id": 917,
+              "vessel_name": "MSC SONIA",
+              "imo_number": "9404663",
+              "resource_id": "T04",
+              "start_time": "2026-09-03T16:00:00+00:00",
+              "end_time": "2026-09-03T16:32:42.471931+00:00",
+              "buffer_minutes": 15,
+              "status": "confirmed"
+            }
+          ]
+        }
+      ],
+      "rejected_plans": [
+        {
+          "option_id": "retain_current_allocation",
+          "strategy": "retain_current_allocation",
+          "target_eta": "2026-09-03T15:30:00+00:00",
+          "affected_vessels": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387"
+            }
+          ],
+          "changes": [
+            {
+              "vessel_name": "WAN HAI 357",
+              "imo_number": "9930387",
+              "allocations": {
+                "berth": {
+                  "resource_id": "B55",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T21:35:01.917301+00:00",
+                  "buffer_minutes": 15
+                },
+                "pilot": {
+                  "resource_id": "P15",
+                  "start_time": "2026-09-03T08:47:48.434151+00:00",
+                  "end_time": "2026-09-03T10:30:00+00:00",
+                  "buffer_minutes": 15
+                },
+                "tug": {
+                  "resource_id": "T11",
+                  "start_time": "2026-09-03T10:30:00+00:00",
+                  "end_time": "2026-09-03T11:11:03.387148+00:00",
+                  "buffer_minutes": 15
+                }
+              }
+            }
+          ],
+          "resource_conflicts": [],
+          "invalid_reason": "Current allocation timing is no longer feasible with the revised ETA."
+        }
+      ]
+    }
+  ]
+}
