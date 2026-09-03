@@ -12,6 +12,7 @@ Each execution appends its report to ``test_output/run_output_<n>.txt``.
 
 import argparse
 import json
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -58,16 +59,46 @@ def main() -> None:
     eta_changes = [change for change in changes if change["event"] == "ETA_CHANGED"]
     vessel_reports = []
 
-    for change in eta_changes:
+    print(f"\n{len(eta_changes)} ETA change(s) to validate and rank.")
+
+    for index, change in enumerate(eta_changes, start=1):
         vessel_name = change["vessel_name"]
         imo_number = change["imo_number"]
         revised_eta = datetime.fromisoformat(change["new_eta"])
 
-        generated_options = generate_schedule_options(
-            vessel_name, imo_number, revised_eta
-        )
-        valid_options, invalid_options = filter_valid_options(generated_options)
-        ranked_options = rank_options(valid_options)
+        print(f"\n[{index}/{len(eta_changes)}] {vessel_name} ({imo_number}) -> {revised_eta.isoformat()}")
+
+        # One bad vessel (missing data, an unexpected error from any stage)
+        # must not crash the whole batch and lose every other vessel's
+        # already-computed results 
+        try:
+            started_at = time.perf_counter()
+            generated_options = generate_schedule_options(
+                vessel_name, imo_number, revised_eta
+            )
+
+            print(
+                f"  generate_schedule_options: {len(generated_options)} candidate(s) "
+                f"in {time.perf_counter() - started_at:.3f}s"
+            )
+
+            started_at = time.perf_counter()
+            valid_options, invalid_options = filter_valid_options(generated_options)
+            print(
+                f"  filter_valid_options: {len(valid_options)} valid, {len(invalid_options)} invalid "
+                f"in {time.perf_counter() - started_at:.3f}s"
+            )
+
+            started_at = time.perf_counter()
+            ranked_options = rank_options(valid_options)
+            print(
+                f"  rank_options: ranked {len(ranked_options)} option(s) "
+                f"in {time.perf_counter() - started_at:.3f}s"
+            )
+        except Exception as error:
+            print(f"  Skipping {vessel_name} ({imo_number}) due to error: {error}")
+            continue
+
         vessel_reports.append(
             {
                 "vessel_name": vessel_name,
