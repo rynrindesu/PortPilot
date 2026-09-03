@@ -1,11 +1,27 @@
 """LangGraph workflow for PortPilot's rescheduling agent."""
 
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
-from typing import Annotated, Literal, TypedDict, Mapping
+from typing import Annotated, Literal, TypedDict
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+)
 
 from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 
+from PortPilot.agent.tools import TOOLS
+
+MAX_AGENT_ITERATIONS = 12
+
+# Executes tool calls requested by the model.
+tool_node = ToolNode(TOOLS)
 
 AgentOutcome = Literal[
     "rescheduled",
@@ -119,3 +135,59 @@ def initial_state(event: Mapping[str, object]) -> AgentState:
         iteration_count=0,
         replan_count=0,
     )
+
+# Calls the model to decide what to do next and records its response.
+# The response may contain a tool request, which the graph routes to the tool node.
+def create_chatbot_node(
+    model: BaseChatModel,
+    system_prompt: str,
+) -> Callable[[AgentState], dict]:
+    """Create the graph node that asks the tool-enabled model what to do next."""
+
+    if not system_prompt.strip():
+        raise ValueError("A system prompt is required.")
+
+    # Bind once while constructing the graph, rather than on every graph turn.
+    model_with_tools = model.bind_tools(TOOLS)
+
+    def chatbot_node(state: AgentState) -> dict:
+        """Ask the agent to reason, call a tool, or return a final response."""
+
+        messages = state.get("messages", [])
+        iteration_count = state.get("iteration_count", 0) + 1
+
+        response = model_with_tools.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                *messages,
+            ]
+        )
+
+        return {
+            "messages": [response],
+            "iteration_count": iteration_count,
+        }
+
+    return chatbot_node
+
+# Inspects the decision of the chatbot through history, and decides where the graph should go next
+# Conditional edge on the graph
+def route_after_chatbot(
+    state: AgentState,
+) -> Literal["validate_tools", "finalize"]:
+    """Route tool requests for validation, or finish when the agent responds."""
+
+    # Prevent the agent from reasoning or calling tools forever.
+    if state.get("iteration_count", 0) >= MAX_AGENT_ITERATIONS:
+        return "finalize"
+
+    messages = state.get("messages", [])
+    if not messages:
+        return "finalize"
+
+    last_message = messages[-1]
+
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
+        return "validate_tools"
+
+    return "finalize"
