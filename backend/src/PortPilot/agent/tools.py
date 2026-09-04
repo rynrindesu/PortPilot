@@ -436,5 +436,30 @@ def flag_for_review(resource_type: str, vessel_name: str, imo_number: str, reaso
     return _json(result)
 
 
-TOOLS = [get_vessel_schedule, get_ranked_options, reschedule_operations, flag_for_review]
+
+# -- When the model intentionally chose to not alter the schedule
+#
+# Prevents the outcome to be 'unable_to_resolve' eventhough the plan is valid & unchanged.
+@tool
+def complete_no_action(option_id: str, reason: str) -> str:
+    """Complete the workflow without changing allocations.
+
+    Use only when get_ranked_options returned a valid
+    retain_current_allocation option.
+    """
+
+    if not reason or not reason.strip():
+        return _json({
+            "success": False,
+            "message": "A reason is required.",
+        })
+
+    return _json({
+        "success": True,
+        "outcome": "no_action",
+        "option_id": option_id,
+        "reason": reason.strip(),
+    })
+
+TOOLS = [get_vessel_schedule, get_ranked_options, reschedule_operations, flag_for_review, complete_no_action]
 TOOLS_BY_NAME = {tool_definition.name: tool_definition for tool_definition in TOOLS}
