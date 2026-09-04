@@ -1,3 +1,5 @@
+from fastapi import APIRouter
+
 from PortPilot.models.documents import (
     ExtractedDocument,
     ExtractedField,
@@ -18,9 +20,15 @@ from PortPilot.compliance.engine import (
 from PortPilot.compliance.escalation import (
     determine_escalation,
 )
-    
-def field(value):
 
+
+router = APIRouter(
+    prefix="/compliance-demo",
+    tags=["Compliance Demo"],
+)
+
+
+def field(value):
     return ExtractedField(
         value=value,
         confidence=0.95,
@@ -28,7 +36,12 @@ def field(value):
     )
 
 
-def test_matching_documents():
+# =========================================================
+# TEST 1 — Matching Documents
+# =========================================================
+
+@router.get("/matching-documents")
+def matching_documents():
 
     registry = ExtractedDocument(
         document_type="certificate_of_registry",
@@ -50,11 +63,22 @@ def test_matching_documents():
         [registry, declaration]
     )
 
-    assert result.status == "PASS"
-    assert result.issues == []
+    return {
+        "test": "matching_documents",
+        "status": result.status,
+        "issues": [
+            issue.model_dump()
+            for issue in result.issues
+        ],
+    }
 
 
-def test_call_sign_mismatch():
+# =========================================================
+# TEST 2 — Call Sign Mismatch
+# =========================================================
+
+@router.get("/call-sign-mismatch")
+def call_sign_mismatch():
 
     registry = ExtractedDocument(
         document_type="certificate_of_registry",
@@ -74,14 +98,22 @@ def test_call_sign_mismatch():
         [registry, declaration]
     )
 
-    assert result.status == "CORRECTION_REQUIRED"
+    return {
+        "test": "call_sign_mismatch",
+        "status": result.status,
+        "issues": [
+            issue.model_dump()
+            for issue in result.issues
+        ],
+    }
 
-    assert any(
-        issue.field == "call_sign"
-        for issue in result.issues
-    )
-    
-def test_compliant_arrival():
+
+# =========================================================
+# TEST 3 — Compliant Arrival
+# =========================================================
+
+@router.get("/compliant-arrival")
+def compliant_arrival():
 
     registry = ExtractedDocument(
         document_type="certificate_of_registry",
@@ -124,9 +156,22 @@ def test_compliant_arrival():
         [registry, arrival],
     )
 
-    assert result.status == "PASS"
-    
-def test_missing_required_document():
+    return {
+        "test": "compliant_arrival",
+        "status": result.status,
+        "issues": [
+            issue.model_dump()
+            for issue in result.issues
+        ],
+    }
+
+
+# =========================================================
+# TEST 4 — Missing Required Document
+# =========================================================
+
+@router.get("/missing-required-document")
+def missing_required_document():
 
     arrival = ExtractedDocument(
         document_type="arrival_general_declaration",
@@ -146,14 +191,22 @@ def test_missing_required_document():
         [arrival],
     )
 
-    assert result.status == "CORRECTION_REQUIRED"
+    return {
+        "test": "missing_required_document",
+        "status": result.status,
+        "issues": [
+            issue.model_dump()
+            for issue in result.issues
+        ],
+    }
 
-    assert any(
-        issue.code == "MISSING_REQUIRED_DOCUMENT"
-        for issue in result.issues
-    )
-    
-def test_inconsistent_imo():
+
+# =========================================================
+# TEST 5 — Inconsistent IMO
+# =========================================================
+
+@router.get("/inconsistent-imo")
+def inconsistent_imo():
 
     registry = ExtractedDocument(
         document_type="certificate_of_registry",
@@ -180,41 +233,81 @@ def test_inconsistent_imo():
         [registry, arrival],
     )
 
-    assert result.status == "CORRECTION_REQUIRED"
-    
-def test_escalation_correction_required():
+    return {
+        "test": "inconsistent_imo",
+        "status": result.status,
+        "issues": [
+            issue.model_dump()
+            for issue in result.issues
+        ],
+    }
+
+
+# =========================================================
+# TEST 6 — Escalation: Correction Required
+# =========================================================
+
+@router.get("/escalation/correction-required")
+def escalation_correction_required():
 
     result = determine_escalation(
         compliance_status="CORRECTION_REQUIRED",
     )
 
-    assert result["action"] == "CORRECTION_REQUIRED"
+    return {
+        "test": "escalation_correction_required",
+        **result,
+    }
 
 
-def test_escalation_human_review():
+# =========================================================
+# TEST 7 — Escalation: Human Review
+# =========================================================
+
+@router.get("/escalation/human-review")
+def escalation_human_review():
 
     result = determine_escalation(
         compliance_status="HUMAN_REVIEW",
     )
 
-    assert result["action"] == "HUMAN_REVIEW"
+    return {
+        "test": "escalation_human_review",
+        **result,
+    }
 
 
-def test_escalation_physical_inspection():
+# =========================================================
+# TEST 8 — Escalation: Physical Inspection
+# =========================================================
+
+@router.get("/escalation/physical-inspection")
+def escalation_physical_inspection():
 
     result = determine_escalation(
         compliance_status="PASS",
         physical_inspection_required=True,
     )
 
-    assert result["action"] == "INSPECTION_REQUIRED"
+    return {
+        "test": "escalation_physical_inspection",
+        **result,
+    }
 
 
-def test_escalation_no_escalation():
+# =========================================================
+# TEST 9 — Escalation: No Escalation
+# =========================================================
+
+@router.get("/escalation/no-escalation")
+def escalation_no_escalation():
 
     result = determine_escalation(
         compliance_status="PASS",
         physical_inspection_required=False,
     )
 
-    assert result["action"] == "NO_ESCALATION"
+    return {
+        "test": "escalation_no_escalation",
+        **result,
+    }
