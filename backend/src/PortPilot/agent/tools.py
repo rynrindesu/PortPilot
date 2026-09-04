@@ -233,7 +233,7 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
                     # Read the existing allocation before replacing it.
                     # These values are also needed for the audit log.
                     cursor.execute(
-                        f"SELECT {resource_column}, start_time, end_time, buffer_minutes "
+                        f"SELECT {resource_column}, start_time, end_time, buffer_minutes, status "
                         f"FROM {table} WHERE vessel_name = %s AND imo_number = %s FOR UPDATE",
                         (vessel_name, imo_number),
                     )
@@ -245,12 +245,22 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
                             f"No existing {resource_type} allocation found for "
                             f"{vessel_name} ({imo_number})."
                         )
-                    old_resource_id, old_start, old_end, old_buffer = row
+                    old_resource_id, old_start, old_end, old_buffer, old_status = row
+
+                    # A pending-review allocation is controlled by the human
+                    # review workflow and must not be cleared by an autonomous
+                    # reschedule. This check happens after the row lock so a
+                    # concurrent review flag cannot race with this update.
+                    if old_status == "pending_review":
+                        raise ValueError(
+                            f"{vessel_name}'s {resource_type} allocation is pending human review "
+                            "and cannot be changed autonomously."
+                        )
 
                     # Replace the vessel's existing allocation with the new one.
                     cursor.execute(
                         f"UPDATE {table} SET {resource_column} = %s, start_time = %s, "
-                        f"end_time = %s, buffer_minutes = %s, updated_at = NOW() "
+                        f"end_time = %s, buffer_minutes = %s, status = 'confirmed', updated_at = NOW() "
                         f"WHERE vessel_name = %s AND imo_number = %s",
                         (
                             resource_id, allocation["start_time"],

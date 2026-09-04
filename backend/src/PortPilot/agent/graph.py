@@ -666,6 +666,13 @@ def verify_node(state: AgentState) -> dict:
                     f"{vessel_name}'s {resource_type} buffer does not match."
                 )
 
+            # Ensure the resource allocations are also confirmed.
+            if actual.get("status") != "confirmed":
+                mismatches.append(
+                    f"{vessel_name}'s {resource_type} allocation status does not match: "
+                    f"expected confirmed, found {actual.get('status')}."
+                )
+
     # Tabulates the number of mismatches and returns to the agent
     result = {
         "verified": len(mismatches) == 0,
