@@ -1,0 +1,165 @@
+PORTPILOT GRAPH TOOL / AI SIMULATION RESULTS
+============================================
+
+test_01_rescheduled (__main__.GraphToolsAISimulationTests.test_01_rescheduled)
+A valid selected option is applied, read back, and verified. ... ok
+test_02_no_action (__main__.GraphToolsAISimulationTests.test_02_no_action)
+A valid retain option ends intentionally without database writes. ... ok
+test_03_pending_review (__main__.GraphToolsAISimulationTests.test_03_pending_review)
+No valid plan exists, so the AI escalates the affected resource. ... ok
+test_04_unable_to_resolve (__main__.GraphToolsAISimulationTests.test_04_unable_to_resolve)
+The agent reaches its safety limit without an action or escalation. ... ok
+test_05_failed (__main__.GraphToolsAISimulationTests.test_05_failed)
+A reported write whose database state does not match is failed. ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK
+
+OVERALL RESULT: PASS
+
+AI SIMULATION METHOD
+--------------------
+The AI is simulated by deterministic AIMessage objects containing the exact
+structured tool calls a bound chat model would emit. Real graph validation,
+routing, result processing, verification, and finalization code is executed.
+ToolMessage objects reproduce the interface through which ToolNode returns
+observations to the model.
+
+RATIONALE
+---------
+Scripted decisions isolate the graph contract from model randomness, API
+availability, cost, and prompt variation. Database writes are represented by
+controlled results, so outcome logic can be tested without altering operational
+data. The complete_no_action tool is safe and is executed for real.
+
+EVALUATION OF ACCURACY
+----------------------
+High fidelity: message shapes, tool arguments, tool-call validation, state
+updates, conditional routes, option provenance, post-write comparison, and
+final outcome classification.
+
+Not covered: whether a real model chooses the correct tool or rationale, model
+provider formatting differences, live ToolNode execution inside a compiled
+StateGraph, database transaction behavior, concurrency, or network failures.
+Those require later compiled-graph integration tests and a small set of live
+model evaluations.
+
+SAMPLE FINAL OUTCOMES
+---------------------
+{
+  "failed": {
+    "agent_response": "The write was reported as successful, but verification failed.",
+    "errors": [],
+    "flagged_resources": [],
+    "imo_number": "9000001",
+    "iterations": 4,
+    "new_eta": "2026-09-04T12:00:00+00:00",
+    "outcome": "failed",
+    "previous_eta": "2026-09-04T09:00:00+00:00",
+    "selected_option_id": "alternative_resources_1",
+    "verification_result": {
+      "checked_vessels": [
+        {
+          "imo_number": "9000001",
+          "vessel_name": "AI SIMULATION VESSEL"
+        }
+      ],
+      "mismatches": [
+        "AI SIMULATION VESSEL's berth allocation status does not match: expected confirmed, found pending_review."
+      ],
+      "verified": false
+    },
+    "vessel_name": "AI SIMULATION VESSEL",
+    "write_result": {
+      "changes_applied": [],
+      "option_id": "alternative_resources_1",
+      "success": true
+    }
+  },
+  "no_action": {
+    "agent_response": "The current allocations remain valid, so no schedule change was required.",
+    "errors": [],
+    "flagged_resources": [],
+    "imo_number": "9000001",
+    "iterations": 4,
+    "new_eta": "2026-09-04T12:00:00+00:00",
+    "outcome": "no_action",
+    "previous_eta": "2026-09-04T09:00:00+00:00",
+    "selected_option_id": "retain_current_allocation",
+    "verification_result": null,
+    "vessel_name": "AI SIMULATION VESSEL",
+    "write_result": null
+  },
+  "pending_review": {
+    "agent_response": "No valid automatic plan exists; the berth was flagged for human review.",
+    "errors": [],
+    "flagged_resources": [
+      "berth"
+    ],
+    "imo_number": "9000001",
+    "iterations": 4,
+    "new_eta": "2026-09-04T12:00:00+00:00",
+    "outcome": "pending_review",
+    "previous_eta": "2026-09-04T09:00:00+00:00",
+    "selected_option_id": null,
+    "verification_result": null,
+    "vessel_name": "AI SIMULATION VESSEL",
+    "write_result": null
+  },
+  "rescheduled": {
+    "agent_response": "The ranked schedule was applied and independently verified.",
+    "errors": [],
+    "flagged_resources": [],
+    "imo_number": "9000001",
+    "iterations": 4,
+    "new_eta": "2026-09-04T12:00:00+00:00",
+    "outcome": "rescheduled",
+    "previous_eta": "2026-09-04T09:00:00+00:00",
+    "selected_option_id": "shift_same_resources",
+    "verification_result": {
+      "checked_vessels": [
+        {
+          "imo_number": "9000001",
+          "vessel_name": "AI SIMULATION VESSEL"
+        }
+      ],
+      "mismatches": [],
+      "verified": true
+    },
+    "vessel_name": "AI SIMULATION VESSEL",
+    "write_result": {
+      "changes_applied": [
+        {
+          "resource_type": "berth",
+          "vessel_name": "AI SIMULATION VESSEL"
+        },
+        {
+          "resource_type": "pilot",
+          "vessel_name": "AI SIMULATION VESSEL"
+        },
+        {
+          "resource_type": "tug",
+          "vessel_name": "AI SIMULATION VESSEL"
+        }
+      ],
+      "option_id": "shift_same_resources",
+      "success": true
+    }
+  },
+  "unable_to_resolve": {
+    "agent_response": "I could not determine a safe action within the allowed iterations.",
+    "errors": [],
+    "flagged_resources": [],
+    "imo_number": "9000001",
+    "iterations": 12,
+    "new_eta": "2026-09-04T12:00:00+00:00",
+    "outcome": "unable_to_resolve",
+    "previous_eta": "2026-09-04T09:00:00+00:00",
+    "selected_option_id": null,
+    "verification_result": null,
+    "vessel_name": "AI SIMULATION VESSEL",
+    "write_result": null
+  }
+}
