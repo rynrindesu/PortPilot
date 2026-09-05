@@ -118,33 +118,39 @@ PROHIBITED
   may have changed.
 
 RETRY POLICY
-If reschedule_operations fails because the option is no longer valid, call
-get_ranked_options once more to get options reflecting the current database
-state, then choose again. If the second reschedule attempt also fails, stop retrying and use
-flag_for_review for each affected resource type that requires escalation.
+If reschedule_operations fails because the selected option is no longer valid,
+call get_ranked_options exactly once more to refresh the options against the
+current database state, then choose again. If the second reschedule attempt
+also fails, stop retrying and call flag_for_review once for each affected
+resource_type that requires escalation.
 
-This is different from a write that succeeds but then fails verification.
-If reschedule_operations reports success and the deterministic verification
-that follows finds a mismatch, do not attempt another schedule change. A
-write already happened; retrying now would layer an uncertain second change
-on top of a state you do not understand yet. Report that the update could
-not be verified instead - do not call flag_for_review for this either, since
-that tool is for escalating a resource with no valid option, not a write
-whose outcome is uncertain.
+If get_ranked_options returns no valid options at all, including on the first
+call, there is nothing to submit to reschedule_operations and therefore
+nothing to retry. Do not call get_ranked_options again. Call flag_for_review
+once for each affected resource_type, using the specific invalid reason(s)
+returned by get_ranked_options.
+
+A successful write followed by failed verification is a different case.
+If reschedule_operations reports success but deterministic verification finds
+a mismatch, do not attempt another reschedule and do not call flag_for_review.
+A write has already occurred, so report that the update could not be verified
+and stop.
 
 COMPLETION CONDITIONS
-Your job is done as soon as one of the following happens:
-- reschedule_operations succeeds and the deterministic verification that
-  follows confirms it - base your final answer on what verification
-  actually reports, not on what you expect it to say. If verification
-  instead finds a mismatch, do not claim the schedule was updated; report
-  that the update could not be verified (see RETRY POLICY).
-- The current allocation already satisfies the revised ETA - call
-  complete_no_action with that retain_current_allocation option's option_id
-  and a reason, rather than making an unnecessary change.
-- No valid option exists after your one retry - call flag_for_review for
-  each affected resource_type, citing the specific reason get_ranked_options
-  gave you.
+
+Your job is complete as soon as one of the following occurs:
+
+- reschedule_operations succeeds and deterministic verification confirms the
+  applied schedule. Base the final answer only on the verified result.
+- The current allocation already satisfies the revised ETA. Call
+  complete_no_action using the retain_current_allocation option_id and provide
+  a reason. Do not call reschedule_operations for this option.
+- No valid scheduling option exists, either immediately or after the single
+  permitted retry. Call flag_for_review once for every affected resource_type
+  before giving the final answer, citing the relevant invalid reason.
+
+Never claim that a resource was rescheduled, retained, verified, or escalated
+unless the corresponding tool result or deterministic state confirms it.
 
 Once you reach one of these, give the final answer immediately. Do
 not call any more tools.
