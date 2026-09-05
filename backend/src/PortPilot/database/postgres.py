@@ -392,6 +392,76 @@ def get_vessel_schedule(vessel_name, imo_number):
                     schedule["allocations"][resource_type] = assignments[0]
     return schedule
 
+# Fetch full schedules for multiple vessels in bulk.
+
+# Returns {(vessel_name, imo_number): schedule}.
+# Missing vessels are omitted from the result.
+def get_vessel_schedules_by_keys(vessel_keys):
+    vessel_keys = list(vessel_keys)
+    if not vessel_keys:
+        return {}
+
+    placeholders = ", ".join(["(%s, %s)"] * len(vessel_keys))
+    params = [value for key in vessel_keys for value in key]
+
+    schedules = {}
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT
+                    vessel_name, imo_number, original_eta, previous_eta, current_eta,
+                    call_sign, flag, location_from, location_to, status,
+                    last_eta_received_at, last_updated
+                FROM vessel_state
+                WHERE (vessel_name, imo_number) IN ({placeholders})
+                """,
+                params,
+            )
+            for row in cursor.fetchall():
+                key = (row[0], row[1])
+                schedules[key] = {
+                    "vessel": {
+                        "vessel_name": row[0],
+                        "original_eta": row[2],
+                        "previous_eta": row[3],
+                        "current_eta": row[4],
+                        "call_sign": row[5],
+                        "imo_number": row[1],
+                        "flag": row[6],
+                        "location_from": row[7],
+                        "location_to": row[8],
+                        "status": row[9],
+                        "last_eta_received_at": row[10],
+                        "last_updated": row[11],
+                    },
+                    "allocations": {"berth": None, "pilot": None, "tug": None},
+                }
+
+            for resource_type, (table, resource_column, id_column) in RESOURCE_TABLES.items():
+                cursor.execute(
+                    f"""
+                    SELECT vessel_name, imo_number, {id_column}, {resource_column},
+                           start_time, end_time, buffer_minutes, status
+                    FROM {table}
+                    WHERE (vessel_name, imo_number) IN ({placeholders})
+                    """,
+                    params,
+                )
+                for row in cursor.fetchall():
+                    key = (row[0], row[1])
+                    if key not in schedules:
+                        continue
+                    schedules[key]["allocations"][resource_type] = {
+                        "assignment_id": row[2],
+                        "resource_id": row[3],
+                        "start_time": row[4],
+                        "end_time": row[5],
+                        "buffer_minutes": row[6],
+                        "status": row[7],
+                    }
+    return schedules
+
 
 def find_resource_conflicts(
     resource_type,

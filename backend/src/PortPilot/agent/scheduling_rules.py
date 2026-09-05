@@ -11,12 +11,13 @@ ranks scheduling candidates generated for a disrupted vessel.
 """
 
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 
 from PortPilot.database.postgres import (
     get_vessel_schedule,
-    find_resource_conflicts,
     get_allocations_in_window,
     get_connection,
+    index_allocations_by_resource,
 )
 
 # Bookings within this window cannot be automatically rescheduled.
@@ -82,6 +83,18 @@ def is_booking_locked(current_allocation, now=None):
     return current_allocation["start_time"] < now + timedelta(hours=FREEZE_WINDOW_HOURS)
 
 
+# Find conflicting bookings from the pre-fetched resource index.
+def _conflicts_from_index(allocations_by_resource, resource_type, resource_id,
+                           start, end, buffer_minutes):
+    candidate_occupied_end = end + timedelta(minutes=buffer_minutes)
+    conflicts = []
+    for booking in allocations_by_resource.get((resource_type, resource_id), []):
+        booking_occupied_end = booking["end_time"] + timedelta(minutes=booking["buffer_minutes"])
+        if start < booking_occupied_end and booking["start_time"] < candidate_occupied_end:
+            conflicts.append(booking)
+    return conflicts
+
+
 # Check whether a proposed resource slot can be used.
 #
 # If the slot conflicts with another vessel, apply FCFS rules:
@@ -89,17 +102,20 @@ def is_booking_locked(current_allocation, now=None):
 #   it has an earlier original ETA)
 # - available: no conflict, or the conflict is already covered by a
 #   replacement bundled into this same candidate
+#
+# Conflicts are checked using pre-fetched allocations and cached schedules.
 def is_option_available(resource_type, resource_id, start, end, buffer_minutes,
-                         current_vessel, candidate_vessels, this_original_eta):
-    # Find existing database bookings that overlap the proposed slot.
-    conflicts = find_resource_conflicts(
-        resource_type, resource_id, start, end,
-        candidate_buffer_minutes=buffer_minutes,
+                         current_vessel, candidate_vessels, this_original_eta,
+                         allocations_by_resource, schedule_lookup):
+    # Find bookings that overlap the proposed slot.
+    conflicts = _conflicts_from_index(
+        allocations_by_resource, resource_type, resource_id, start, end, buffer_minutes,
     )
 
     # Apply FCFS rules to determine whether these conflicts block the move.
     rejection_reason = resolve_fcfs(
         conflicts, this_original_eta, current_vessel, candidate_vessels, resource_type,
+        schedule_lookup,
     )
 
     # A conflict that cannot be resolved under the scheduling rules
@@ -146,16 +162,12 @@ def _find_internal_conflict(changes):
 
 # Validate one complete scheduling candidate.
 #
-# 0. If this is a "retain_current_allocation" option, check its unchanged
-#    pilot/tug/berth times are still feasible against the revised target_eta.
-# For each proposed allocation:
-# 1. Check that the existing booking is not frozen.
-# 2. Check resource conflicts and apply FCFS. Any conflict not already
-#    covered by a replacement bundled into the candidate is rejected - no
-#    replacement is searched for here.
-#
-# The candidate is valid only when every proposed change passes all checks.
-def _classify_option(option):
+# Checks:
+# 1. Retained timings remain feasible for the revised ETA.
+# 2. Changed bookings are outside the freeze window.
+# 3. Resource conflicts satisfy FCFS rules.
+# 4. Proposed changes do not conflict with each other.
+def _classify_option(option, schedule_lookup, allocations_by_resource):
     if not _is_retain_timing_feasible(option):
         return "invalid", (
             "Current allocation timing is no longer feasible with the revised ETA."
@@ -174,7 +186,7 @@ def _classify_option(option):
         imo_number = change["imo_number"]
         current_vessel = (vessel_name, imo_number)
 
-        schedule = get_vessel_schedule(vessel_name, imo_number)
+        schedule = schedule_lookup(vessel_name, imo_number)
         if schedule is None:
             return "invalid", f"No existing schedule was found for {vessel_name} ({imo_number}).", changes
 
@@ -191,14 +203,15 @@ def _classify_option(option):
                     f"{FREEZE_WINDOW_HOURS}-hour freeze window and cannot be reassigned."
                 ), changes
 
-            # Check database conflicts and FCFS eligibility for this
-            # allocation. Any conflict not already covered by candidate_vessels
-            # rejects the candidate.
+            # Check conflicts and FCFS eligibility for this allocation. Any
+            # conflict not already covered by candidate_vessels rejects the
+            # candidate.
             status, reason = is_option_available(
                 resource_type, allocation["resource_id"],
                 allocation["start_time"], allocation["end_time"],
                 allocation["buffer_minutes"],
                 current_vessel, candidate_vessels, this_original_eta,
+                allocations_by_resource, schedule_lookup,
             )
             if status == "invalid":
                 return "invalid", reason, changes
@@ -211,14 +224,48 @@ def _classify_option(option):
     return "valid", None, changes
 
 
-# Validate all generated candidates and separate them into valid and invalid.
-# Any required replacement allocations must already be included in the candidate.
+# Extra margin for candidate buffer time when bulk-fetching conflicts.
+# Long-running bookings are still captured by the overlap query.
+_FILTER_WINDOW_MARGIN = timedelta(hours=2)
+
+
+# Return the time range covered by all allocations in the candidate options.
+def _options_time_range(options):
+    times = [
+        allocation[field]
+        for option in options
+        for change in option["changes"]
+        for allocation in change["allocations"].values()
+        for field in ("start_time", "end_time")
+    ]
+    if not times:
+        return None
+    return min(times), max(times)
+
+
+# Validate generated candidates and separate them into valid and invalid options.
+#
+# Relevant bookings are bulk-fetched once, and vessel schedules are cached
+# and reused across all candidates.
 def filter_valid_options(options):
+    # A fresh cache per call - scoped to this batch of options only.
+    schedule_lookup = lru_cache(maxsize=None)(get_vessel_schedule)
+
+    time_range = _options_time_range(options)
+    if time_range is not None:
+        window_start = time_range[0] - _FILTER_WINDOW_MARGIN
+        window_end = time_range[1] + _FILTER_WINDOW_MARGIN
+        allocations_by_resource = index_allocations_by_resource(
+            get_allocations_in_window(window_start, window_end)
+        )
+    else:
+        allocations_by_resource = {}
+
     valid = []
     invalid = []
 
     for option in options:
-        status, reason, changes = _classify_option(option)
+        status, reason, changes = _classify_option(option, schedule_lookup, allocations_by_resource)
         if status == "valid":
             affected_vessels = [
                 {"vessel_name": change["vessel_name"], "imo_number": change["imo_number"]}
@@ -236,12 +283,13 @@ def _is_disrupted(vessel):
     return vessel["current_eta"] != vessel["original_eta"]
 
 
-# Apply FCFS when a proposed allocation conflicts with another vessel.
-#
-#
-# Returns a rejection reason, or None if this conflict doesn't block the
-# candidate (no conflict, or already covered).
-def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels, resource_type):
+# Apply FCFS rules when a proposed allocation conflicts with another vessel.
+# Returns a rejection reason if the conflict blocks the candidate.
+def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels, resource_type,
+                  schedule_lookup=None):
+    if schedule_lookup is None:
+        schedule_lookup = get_vessel_schedule
+
     for booking in conflicts:
         conflict_key = (booking["vessel_name"], booking["imo_number"])
 
@@ -253,7 +301,7 @@ def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels
         if (conflict_key[0], conflict_key[1], resource_type) in candidate_vessels:
             continue
 
-        other_schedule = get_vessel_schedule(*conflict_key)
+        other_schedule = schedule_lookup(*conflict_key)
 
         if other_schedule is None:
             return (
@@ -290,19 +338,22 @@ def resolve_fcfs(conflicts, this_original_eta, current_vessel, candidate_vessels
 # Lower values are better.
 
 # Count the unique vessels changed by this option.
-# Fewer affected vessels are preferred.
-def _affected_vessel_count(option):
+# Fewer affected vessels are preferred. Takes no database data, but accepts
+# context for a uniform scorer signature (see _SCORERS/_score_option).
+def _affected_vessel_count(option, context=None):
     return len({(v["vessel_name"], v["imo_number"]) for v in option["affected_vessels"]})
 
 
 # Calculate the total schedule shift across all changed allocations.
 # Smaller shifts from the current schedule are preferred.
-def _total_schedule_shift(option):
+def _total_schedule_shift(option, context=None):
+    schedule_lookup = context["schedule_lookup"] if context else get_vessel_schedule
+
     total = timedelta()
     for change in option["changes"]:
         # Get the vessel's current schedule for comparison.
-        schedule = get_vessel_schedule(change["vessel_name"], change["imo_number"])
-        
+        schedule = schedule_lookup(change["vessel_name"], change["imo_number"])
+
         if schedule is None:
             continue
         
@@ -330,11 +381,12 @@ def _count_previous_changes(vessel_name, imo_number):
             return cursor.fetchone()[0]
 
 
-# Count previous ETA revisions across all unique vessels affected by the option.
-# Fewer repeat changes are preferred to avoid repeatedly disrupting the same vessels.
-def _repeat_changes(option):
+# Count previous ETA changes across all vessels affected by the option.
+# Fewer repeat changes are preferred.
+def _repeat_changes(option, context=None):
+    repeat_count_lookup = context["repeat_count_lookup"] if context else _count_previous_changes
     vessels = {(change["vessel_name"], change["imo_number"]) for change in option["changes"]}
-    return sum(_count_previous_changes(vessel_name, imo_number) for vessel_name, imo_number in vessels)
+    return sum(repeat_count_lookup(vessel_name, imo_number) for vessel_name, imo_number in vessels)
 
 
 # How far this candidate's window looks for a neighbouring booking on the
@@ -343,9 +395,25 @@ def _repeat_changes(option):
 RESOURCE_UTILISATION_WINDOW = timedelta(hours=6)
 
 
-# Measure total idle time between each proposed allocation and the next
-# booking on the same resource. Less idle time means better utilisation.
-def _resource_utilisation(option):
+# Find bookings for a resource within the given window.
+# Use the pre-fetched resource index when available.
+def _bookings_in_window(context, resource_type, resource_id, window_start, window_end):
+    if context is None:
+        return [
+            booking for booking in get_allocations_in_window(window_start, window_end)
+            if booking["resource_type"] == resource_type and booking["resource_id"] == resource_id
+        ]
+    bucket = context["allocations_by_resource"].get((resource_type, resource_id), [])
+    return [
+        booking for booking in bucket
+        if booking["start_time"] < window_end
+        and booking["end_time"] + timedelta(minutes=booking["buffer_minutes"]) > window_start
+    ]
+
+
+# Measure idle time between proposed allocations and the next booking.
+# Less idle time indicates better resource utilisation.
+def _resource_utilisation(option, context=None):
     # Track existing bookings replaced by this candidate.
     replaced_vessel_resources = {
         (change["vessel_name"], change["imo_number"], resource_type)
@@ -378,7 +446,9 @@ def _resource_utilisation(option):
             # Remove DB bookings replaced by this candidate.
             db_bookings = [
                 booking
-                for booking in get_allocations_in_window(window_start, window_end)
+                for booking in _bookings_in_window(
+                    context, resource_type, allocation["resource_id"], window_start, window_end,
+                )
                 if (booking["vessel_name"], booking["imo_number"], booking["resource_type"])
                 not in replaced_vessel_resources
             ]
@@ -421,16 +491,46 @@ _SCORERS = {
 
 # Calculate an option's scores and build its ranking key.
 # Lower values are better, with earlier criteria taking priority.
-def _score_option(option):
-    scores = {criterion: _SCORERS[criterion](option) for criterion in DEFAULT_PRIORITY}
+def _score_option(option, context=None):
+    scores = {criterion: _SCORERS[criterion](option, context) for criterion in DEFAULT_PRIORITY}
     sort_key = tuple(scores[criterion] for criterion in DEFAULT_PRIORITY)
     return sort_key, scores
 
 
-# Rank valid options from best to worst and attach their scores.
+# Extra margin when bulk-fetching bookings used for resource utilisation scoring.
+_RANKING_WINDOW_MARGIN = timedelta(hours=1)
+
+
+# Build shared data used to rank all options.
+# Caches vessel schedules and ETA change counts, and bulk-fetches
+# relevant bookings for resource utilisation scoring.
+def _build_ranking_context(options):
+    # Fresh caches per call - scoped to this batch of options only.
+    schedule_lookup = lru_cache(maxsize=None)(get_vessel_schedule)
+    repeat_count_lookup = lru_cache(maxsize=None)(_count_previous_changes)
+
+    time_range = _options_time_range(options)
+    if time_range is not None:
+        margin = RESOURCE_UTILISATION_WINDOW + _RANKING_WINDOW_MARGIN
+        allocations_by_resource = index_allocations_by_resource(
+            get_allocations_in_window(time_range[0] - margin, time_range[1] + margin)
+        )
+    else:
+        allocations_by_resource = {}
+
+    return {
+        "schedule_lookup": schedule_lookup,
+        "repeat_count_lookup": repeat_count_lookup,
+        "allocations_by_resource": allocations_by_resource,
+    }
+
+
+# Rank valid options from best to worst using DEFAULT_PRIORITY.
 def rank_options(valid_options):
+    context = _build_ranking_context(valid_options)
+
     scored = sorted(
-        (( *_score_option(option), option) for option in valid_options),
+        (( *_score_option(option, context), option) for option in valid_options),
         key=lambda item: item[0],
     )
 

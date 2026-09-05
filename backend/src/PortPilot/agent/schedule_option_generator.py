@@ -12,6 +12,7 @@ from PortPilot.database.postgres import (
     get_active_resources,
     get_allocations_in_window,
     get_vessel_schedule,
+    get_vessel_schedules_by_keys,
     index_allocations_by_resource,
 )
 
@@ -222,6 +223,13 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     # index_allocations_by_resource().
     allocations_by_resource = index_allocations_by_resource(surrounding_allocations)
 
+    # Bulk-fetch full schedules for vessels that may need to be reallocated.
+    candidate_displaced_keys = {
+        _vessel_key(booking["vessel_name"], booking["imo_number"])
+        for booking in surrounding_allocations
+    } - {affected_key}
+    displaced_schedules = get_vessel_schedules_by_keys(candidate_displaced_keys)
+
     # First option tries to preserve the current resource allocation
     options = [
         _candidate(
@@ -256,7 +264,6 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     direct_options = []
     reallocation_options = []
     seen_resource_sets = {tuple(current_resource_ids[resource_type] for resource_type in RESOURCE_TYPES)}
-    displaced_schedules = {}
 
     for resource_ids in _resource_combinations(resources):
         resource_set = tuple(resource_ids[resource_type] for resource_type in RESOURCE_TYPES)
@@ -299,9 +306,7 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
             conflict["resource_type"] for conflict in conflicts
             if _vessel_key(conflict["vessel_name"], conflict["imo_number"]) == displaced_key
         }
-        if displaced_key not in displaced_schedules:
-            displaced_schedules[displaced_key] = get_vessel_schedule(*displaced_key)
-        displaced_schedule = displaced_schedules[displaced_key]
+        displaced_schedule = displaced_schedules.get(displaced_key)
         try:
            _ensure_complete_schedule(displaced_schedule)
         except ValueError:
