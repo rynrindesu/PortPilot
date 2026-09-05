@@ -7,6 +7,20 @@ import logging
 import os
 
 from dotenv import load_dotenv
+from langgraph.graph import END, StateGraph
+
+from PortPilot.agent.graph import (
+    AgentState,
+    create_chatbot_node,
+    finalize_node,
+    process_tool_result_node,
+    route_after_chatbot,
+    route_after_tool_result,
+    route_after_tool_validation,
+    tool_node,
+    validate_tool_call_node,
+    verify_node,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,3 +144,55 @@ Your job is done as soon as one of the following happens:
 Once you reach one of these, give a plain final answer summarizing what
 happened and why. Do not call any more tools after that.
 """
+
+
+def build_graph(model, system_prompt):
+    """Assemble and compile the rescheduling agent's LangGraph state machine.
+
+    model is any LangChain BaseChatModel; system_prompt is passed straight to
+    create_chatbot_node(), which requires a non-empty string.
+    """
+    graph_builder = StateGraph(AgentState)
+
+    # Register every node, including the shared ToolNode(TOOLS) instance
+    # created in graph.py for executing validated tool calls.
+    graph_builder.add_node("chatbot", create_chatbot_node(model, system_prompt))
+    graph_builder.add_node("validate_tools", validate_tool_call_node)
+    graph_builder.add_node("tools", tool_node)
+    graph_builder.add_node("process_tool_result", process_tool_result_node)
+    graph_builder.add_node("verify", verify_node)
+    graph_builder.add_node("finalize", finalize_node)
+
+    graph_builder.set_entry_point("chatbot")
+
+    # The model either requests a tool or gives a final answer.
+    graph_builder.add_conditional_edges(
+        "chatbot",
+        route_after_chatbot,
+        {"validate_tools": "validate_tools", "finalize": "finalize"},
+    )
+
+    # An approved tool call executes; a rejected one goes back to the model
+    # with the rejection reason already in its message history.
+    graph_builder.add_conditional_edges(
+        "validate_tools",
+        route_after_tool_validation,
+        {"tools": "tools", "chatbot": "chatbot"},
+    )
+
+    graph_builder.add_edge("tools", "process_tool_result")
+
+    # A successful write is verified against the database; every other tool
+    # result goes back to the model to decide what to do next.
+    graph_builder.add_conditional_edges(
+        "process_tool_result",
+        route_after_tool_result,
+        {"verify": "verify", "chatbot": "chatbot"},
+    )
+
+    # Return verification to the model so its final response is based on the
+    # actual database result rather than the expected write outcome.
+    graph_builder.add_edge("verify", "chatbot")
+    graph_builder.add_edge("finalize", END)
+
+    return graph_builder.compile()

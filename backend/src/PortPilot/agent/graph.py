@@ -231,11 +231,33 @@ def _reject_tool_call(
     }
 
 
+def _normalize_numbers(value):
+    """Recursively convert every int to a float (bools excluded - bool is a
+    subclass of int in Python, but True/False are not numbers to normalize).
+
+    A model's tool-calling round trip can collapse a computed score like
+    720.0 into the integer 720 - the same value, but json.dumps(720) and
+    json.dumps(720.0) are different strings, which broke exact-match
+    comparison in _canonical_option for an otherwise-identical option.
+    Applying this to both sides before comparing removes that spurious
+    difference without changing what "equal" means for anything else.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    if isinstance(value, dict):
+        return {key: _normalize_numbers(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalize_numbers(item) for item in value]
+    return value
+
+
 def _canonical_option(option: dict) -> str:
     """Create a stable representation for comparing scheduling options."""
 
     return json.dumps(
-        option,
+        _normalize_numbers(option),
         sort_keys=True,
         separators=(",", ":"),
         default=lambda value: (
