@@ -327,6 +327,27 @@ def get_allocations_in_window(window_start, window_end):
                 )
     return allocations
 
+# Fetch which vessels already have berth/pilot/tug allocations once at the beginning of the monitoring poll
+def get_allocation_keys_by_type():
+    keys_by_type = {}
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for resource_type, (table, _resource_column, _id_column) in RESOURCE_TABLES.items():
+                cursor.execute(f"SELECT vessel_name, imo_number FROM {table}")
+                keys_by_type[resource_type] = {(row[0], row[1]) for row in cursor.fetchall()}
+    return keys_by_type
+
+
+# Index bookings by (resource_type, resource_id) so we can look up 
+# only the bookings for one specific resource, instead of scanning 
+# every booking in the planning window for every candidate plan tried
+def index_allocations_by_resource(allocations):
+    index = {}
+    for booking in allocations:
+        key = (booking["resource_type"], booking["resource_id"])
+        index.setdefault(key, []).append(booking)
+    return index
+
 
 def get_vessel_schedule(vessel_name, imo_number):
     """Return a vessel's ETA state and its current resource assignments."""

@@ -12,6 +12,7 @@ from PortPilot.database.postgres import (
     get_active_resources,
     get_allocations_in_window,
     get_vessel_schedule,
+    index_allocations_by_resource,
 )
 
 
@@ -93,18 +94,6 @@ def _plans_overlap(left, right):
         if left_item["start_time"] < right_occupied_end and right_item["start_time"] < left_occupied_end:
             return True
     return False
-
-
-# Index bookings by (resource_type, resource_id) so _conflicts_for_plan()
-# can look up only the bookings for one specific resource, instead of
-# scanning every booking in the planning window for every candidate plan
-# tried
-def _index_allocations_by_resource(allocations):
-    index = {}
-    for booking in allocations:
-        key = (booking["resource_type"], booking["resource_id"])
-        index.setdefault(key, []).append(booking)
-    return index
 
 
 # Checks whether this plan creates conflicts for other existing vessels
@@ -230,8 +219,8 @@ def generate_schedule_options(vessel_name, imo_number, new_eta, now=None):
     window_end = new_eta + PLANNING_LOOKAHEAD
     surrounding_allocations = get_allocations_in_window(window_start, window_end)
     # Indexed once and reused for every candidate plan checked below - see
-    # _index_allocations_by_resource().
-    allocations_by_resource = _index_allocations_by_resource(surrounding_allocations)
+    # index_allocations_by_resource().
+    allocations_by_resource = index_allocations_by_resource(surrounding_allocations)
 
     # First option tries to preserve the current resource allocation
     options = [
