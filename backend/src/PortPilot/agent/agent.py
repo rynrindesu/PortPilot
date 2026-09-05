@@ -80,11 +80,13 @@ def generate_llm_explanation(
         ),
     }
 
-    return llm.invoke(
+    llm_response = llm.invoke(
         system_prompt=PORTPILOT_SYSTEM_PROMPT,
         user_prompt=PORTPILOT_DECISION_PROMPT,
         context=context,
     )
+
+    return llm_response.model_dump()
 
 def run_port_call_agent(
     state: PortCallState,

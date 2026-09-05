@@ -1,14 +1,28 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
+
+class LLMResponse(BaseModel):
+    """
+    Safe output boundary for PortPilot LLM providers.
+
+    LLMs may provide explanatory content only.
+    They cannot return authoritative workflow fields.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    provider: str
+    explanation: str
+
 
 class LLMProvider(ABC):
     """
     Provider-neutral interface for PortPilot LLMs.
-
-    The rest of the agent should depend on this
-    interface instead of depending directly on
-    Bedrock, OpenAI, or any other provider.
     """
 
     @abstractmethod
@@ -18,22 +32,13 @@ class LLMProvider(ABC):
         system_prompt: str,
         user_prompt: str,
         context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """
-        Invoke the language model.
-
-        Returns a structured dictionary rather than
-        unstructured free-form text.
-        """
+    ) -> LLMResponse:
         raise NotImplementedError
 
 
 class MockLLMProvider(LLMProvider):
     """
     Local deterministic mock LLM.
-
-    This lets us develop and test the agent without
-    requiring AWS Bedrock access.
     """
 
     def invoke(
@@ -42,32 +47,12 @@ class MockLLMProvider(LLMProvider):
         system_prompt: str,
         user_prompt: str,
         context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> LLMResponse:
 
         context = context or {}
 
         agent_action = context.get(
             "agent_action",
-            "UNKNOWN",
-        )
-
-        compliance_status = context.get(
-            "compliance_status",
-            "UNKNOWN",
-        )
-
-        risk_level = context.get(
-            "risk_level",
-            "unknown",
-        )
-
-        inspection_decision = context.get(
-            "inspection_decision",
-            "unknown",
-        )
-
-        escalation = context.get(
-            "escalation",
             "UNKNOWN",
         )
 
@@ -103,12 +88,7 @@ class MockLLMProvider(LLMProvider):
                 "workflow action."
             )
 
-        return {
-            "provider": "mock",
-            "agent_action": agent_action,
-            "explanation": explanation,
-            "compliance_status": compliance_status,
-            "risk_level": risk_level,
-            "inspection_decision": inspection_decision,
-            "escalation": escalation,
-        }
+        return LLMResponse(
+            provider="mock",
+            explanation=explanation,
+        )

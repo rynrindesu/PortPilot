@@ -1,7 +1,11 @@
 from typing import Any
 
 from PortPilot.agent.agent import run_port_call_agent
-from PortPilot.agent.llm import LLMProvider
+
+from PortPilot.agent.llm import (
+    LLMProvider,
+    LLMResponse,
+)
 
 from PortPilot.models.documents import (
     ExtractedDocument,
@@ -17,8 +21,12 @@ from PortPilot.workflow.state import (
 
 class MaliciousMockLLMProvider(LLMProvider):
     """
-    Simulates an LLM trying to contradict the
-    deterministic PortPilot decision.
+    Simulates an LLM producing misleading explanatory text.
+
+    The provider cannot return authoritative workflow fields
+    because LLMResponse only allows:
+    - provider
+    - explanation
     """
 
     def invoke(
@@ -27,24 +35,15 @@ class MaliciousMockLLMProvider(LLMProvider):
         system_prompt: str,
         user_prompt: str,
         context: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> LLMResponse:
 
-        return {
-            "provider": "malicious_mock",
-
-            # Intentionally wrong / unsafe
-            "agent_action": "PROCEED",
-
-            "explanation": (
+        return LLMResponse(
+            provider="malicious_mock",
+            explanation=(
                 "The vessel appears safe and should "
-                "be allowed to proceed without inspection."
+                "be allowed to proceed immediately."
             ),
-
-            "compliance_status": "PASS",
-            "risk_level": "low",
-            "inspection_decision": "no_inspection",
-            "escalation": "NO_ESCALATION",
-        }
+        )
 
 
 def build_valid_arrival_document():
@@ -157,7 +156,7 @@ def test_llm_cannot_override_inspection_decision():
     )
 
     # -----------------------------------------
-    # Trusted deterministic result
+    # Trusted deterministic decision
     # -----------------------------------------
 
     assert (
@@ -185,35 +184,30 @@ def test_llm_cannot_override_inspection_decision():
         == "INSPECTION_REQUIRED"
     )
 
+    # -----------------------------------------
+    # LLM produced misleading explanation
+    # -----------------------------------------
+
+    assert (
+        result["llm"]["provider"]
+        == "malicious_mock"
+    )
+
+    assert (
+        "proceed immediately"
+        in result["llm"]["explanation"].lower()
+    )
+
+    # -----------------------------------------
+    # But workflow remains authoritative
+    # -----------------------------------------
+
     assert (
         state.status
         == PortCallStatus.INSPECTION_REQUIRED
     )
-
-    # -----------------------------------------
-    # LLM tried to contradict it
-    # -----------------------------------------
-
-    assert (
-        result["llm"]["agent_action"]
-        == "PROCEED"
-    )
-
-    assert (
-        result["llm"]["risk_level"]
-        == "low"
-    )
-
-    # -----------------------------------------
-    # But LLM output did NOT change workflow
-    # -----------------------------------------
 
     assert (
         result["agent_action"]
-        != result["llm"]["agent_action"]
-    )
-
-    assert (
-        state.status
-        == PortCallStatus.INSPECTION_REQUIRED
+        == "REQUEST_INSPECTION"
     )

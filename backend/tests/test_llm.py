@@ -1,9 +1,17 @@
-from PortPilot.agent.llm import MockLLMProvider
+import pytest
+
+from pydantic import ValidationError
+
+from PortPilot.agent.llm import (
+    MockLLMProvider,
+    LLMResponse,
+)
 
 from PortPilot.agent.prompts import (
     PORTPILOT_SYSTEM_PROMPT,
     PORTPILOT_DECISION_PROMPT,
 )
+
 
 def test_mock_llm_request_inspection():
     llm = MockLLMProvider()
@@ -24,38 +32,14 @@ def test_mock_llm_request_inspection():
         },
     )
 
-    assert result["provider"] == "mock"
-
-    assert (
-        result["agent_action"]
-        == "REQUEST_INSPECTION"
-    )
-
-    assert (
-        result["compliance_status"]
-        == "HUMAN_REVIEW"
-    )
-
-    assert (
-        result["risk_level"]
-        == "high"
-    )
-
-    assert (
-        result["inspection_decision"]
-        == "inspection_required"
-    )
-
-    assert (
-        result["escalation"]
-        == "INSPECTION_REQUIRED"
-    )
+    assert result.provider == "mock"
 
     assert (
         "physical inspection"
-        in result["explanation"].lower()
+        in result.explanation.lower()
     )
-    
+
+
 def test_mock_llm_proceed():
     llm = MockLLMProvider()
 
@@ -71,13 +55,11 @@ def test_mock_llm_proceed():
         },
     )
 
-    assert result["agent_action"] == "PROCEED"
-    assert result["compliance_status"] == "PASS"
-    assert result["risk_level"] == "low"
+    assert result.provider == "mock"
 
     assert (
         "proceed"
-        in result["explanation"].lower()
+        in result.explanation.lower()
     )
 
 
@@ -96,14 +78,11 @@ def test_mock_llm_request_correction():
         },
     )
 
-    assert (
-        result["agent_action"]
-        == "REQUEST_CORRECTION"
-    )
+    assert result.provider == "mock"
 
     assert (
         "correct"
-        in result["explanation"].lower()
+        in result.explanation.lower()
     )
 
 
@@ -122,16 +101,14 @@ def test_mock_llm_request_human_review():
         },
     )
 
-    assert (
-        result["agent_action"]
-        == "REQUEST_HUMAN_REVIEW"
-    )
+    assert result.provider == "mock"
 
     assert (
         "human review"
-        in result["explanation"].lower()
+        in result.explanation.lower()
     )
-    
+
+
 def test_mock_llm_with_portpilot_prompts():
     llm = MockLLMProvider()
 
@@ -147,14 +124,36 @@ def test_mock_llm_with_portpilot_prompts():
         },
     )
 
-    assert result["provider"] == "mock"
-
-    assert (
-        result["agent_action"]
-        == "REQUEST_INSPECTION"
-    )
+    assert result.provider == "mock"
 
     assert (
         "physical inspection"
-        in result["explanation"].lower()
+        in result.explanation.lower()
+    )
+
+
+def test_llm_response_rejects_authoritative_fields():
+    with pytest.raises(ValidationError):
+        LLMResponse(
+            provider="malicious",
+            explanation=(
+                "The vessel should proceed."
+            ),
+            agent_action="PROCEED",
+        )
+
+
+def test_llm_response_accepts_safe_output():
+    response = LLMResponse(
+        provider="mock",
+        explanation=(
+            "Human inspection is required."
+        ),
+    )
+
+    assert response.provider == "mock"
+
+    assert (
+        response.explanation
+        == "Human inspection is required."
     )
