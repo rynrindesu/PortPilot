@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from PortPilot.database.postgres import (
     get_vessel_state,
+    get_vessel_schedule,
     record_eta_change,
     refresh_vessel_observation,
     save_new_vessel_observation,
@@ -14,17 +15,20 @@ from PortPilot.database.postgres import (
     index_allocations_by_resource,
     RESOURCE_TABLES,
 )
+from PortPilot.agent.schedule_option_generator import generate_schedule_options
+from PortPilot.agent.scheduling_rules import filter_valid_options, rank_options
+from PortPilot.agent.tools import apply_schedule_option, flag_allocation_for_review
 
 
-# Pick a conflict-free resource if possible.
-# Otherwise assign one as pending_review.
+# Pick a conflict-free resource if available.
+# Otherwise create an unconfirmed assignment for later rescheduling.
 def pick_available_resource(candidates, is_available):
     shuffled = list(candidates)
     random.shuffle(shuffled)
     for resource_id in shuffled:
         if is_available(resource_id):
             return resource_id, "confirmed"
-    return random.choice(candidates), "pending_review"
+    return random.choice(candidates), "unconfirmed"
 
 
 def normalize_eta(value):
@@ -210,3 +214,61 @@ def monitor_vessels(date):
         print("No changes since last update.")
 
     return changes
+
+
+# Retry a vessel's unconfirmed assignments using the scheduling pipeline.
+# Apply the best valid option (outcome: "resources_allocated"), or escalate
+# to pending_review if none exists (outcome: "pending_review").
+def retry_unconfirmed_operations(vessel_name, imo_number):
+    schedule = get_vessel_schedule(vessel_name, imo_number)
+    if schedule is None:
+        return {
+            "vessel_name": vessel_name, "imo_number": imo_number,
+            "unconfirmed_resource_types": [], "outcome": "not_found",
+            "applied": None, "escalated": [],
+        }
+
+    unconfirmed_types = [
+        resource_type for resource_type, allocation in schedule["allocations"].items()
+        if allocation is not None and allocation["status"] == "unconfirmed"
+    ]
+    if not unconfirmed_types:
+        return {
+            "vessel_name": vessel_name, "imo_number": imo_number,
+            "unconfirmed_resource_types": [], "outcome": "no_action",
+            "applied": None, "escalated": [],
+        }
+
+    eta = schedule["vessel"]["current_eta"]
+    try:
+        generated = generate_schedule_options(vessel_name, imo_number, eta)
+        valid, invalid = filter_valid_options(generated)
+        ranked = rank_options(valid)
+    except ValueError as error:
+        # Treat an incomplete schedule as having no valid option.
+        ranked, invalid = [], [{"invalid_reason": str(error)}]
+
+    if ranked:
+        reason = (
+            f"Automatically resolved unconfirmed {', '.join(unconfirmed_types)} "
+            "assignment(s) found at discovery time."
+        )
+        applied = apply_schedule_option(ranked[0], reason, execution_mode="new_vessel_retry")
+        return {
+            "vessel_name": vessel_name, "imo_number": imo_number,
+            "unconfirmed_resource_types": unconfirmed_types,
+            "outcome": "resources_allocated" if applied["success"] else "apply_failed",
+            "applied": applied, "escalated": [],
+        }
+
+    escalation_reason = invalid[0]["invalid_reason"] if invalid else "No valid scheduling option was found."
+    escalated = [
+        flag_allocation_for_review(resource_type, vessel_name, imo_number, escalation_reason)
+        for resource_type in unconfirmed_types
+    ]
+    return {
+        "vessel_name": vessel_name, "imo_number": imo_number,
+        "unconfirmed_resource_types": unconfirmed_types,
+        "outcome": "pending_review",
+        "applied": None, "escalated": escalated,
+    }

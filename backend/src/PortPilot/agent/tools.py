@@ -191,6 +191,15 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
         key=lambda item: (item[0], item[3]["resource_id"]),
     )
 
+    # Track vessels whose allocations are included in this option.
+    # Their existing booking for the same resource type should not block
+    # another allocation being reassigned within the same option.
+    option_vessels_by_resource_type = {
+        (change["vessel_name"], change["imo_number"], resource_type)
+        for change in changes
+        for resource_type in change["allocations"]
+    }
+
     # Keep track of successfully applied changes for the final response.
     applied = []
     
@@ -222,7 +231,14 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
                         candidate_buffer_minutes=allocation["buffer_minutes"],
                         exclude_vessel_name=vessel_name, exclude_imo_number=imo_number,
                     )
-                    
+
+                    # Ignore existing bookings that are being reassigned within this same option.
+                    conflicts = [
+                        conflict for conflict in conflicts
+                        if (conflict["vessel_name"], conflict["imo_number"], resource_type)
+                        not in option_vessels_by_resource_type
+                    ]
+
                     # Abort the whole option if the resource is no longer available.
                     if conflicts:
                         raise ValueError(
