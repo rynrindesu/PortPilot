@@ -252,20 +252,34 @@ def _retry_unconfirmed_vessel(event: dict) -> dict:
 
 
 def _deduplicate_events(events: list) -> list:
-    """Keep only the first event per vessel because the API may return duplicate
-    vessels, which could otherwise cause the same schedule to be processed twice.
+    """Collapse duplicate vessel events within one poll batch.
+
+    OCEANS-X may return the same vessel multiple times with different ETAs.
+    Since monitor_vessels() processes and persists rows sequentially, the
+    later event is kept so it matches the final state stored in the database.
+
+    Identical duplicates are silently ignored. Conflicting duplicates are
+    logged as warnings before the later event replaces the earlier one.
     """
-    seen = set()
-    deduplicated = []
+    by_key = {}
+    order = []
     for event in events:
         key = (event["vessel_name"], event["imo_number"])
-        if key in seen:
-            logger.warning(
-                "Duplicate event for %s (%s) in this poll - keeping only the "
-                "first (event=%s)",
-                event["vessel_name"], event["imo_number"], event.get("event"),
-            )
+        if key not in by_key:
+            by_key[key] = event
+            order.append(key)
             continue
-        seen.add(key)
-        deduplicated.append(event)
-    return deduplicated
+
+        previous_event = by_key[key]
+        if previous_event == event:
+            continue
+
+        logger.warning(
+            "Conflicting duplicate events for %s (%s) in this poll - keeping "
+            "the later one since it matches what monitor_vessels() persisted "
+            "last. earlier=%s later=%s",
+            event["vessel_name"], event["imo_number"], previous_event, event,
+        )
+        by_key[key] = event
+
+    return [by_key[key] for key in order]
