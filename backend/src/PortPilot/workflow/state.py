@@ -13,12 +13,15 @@ class PortCallPhase(str, Enum):
     OPERATIONS = "operations"
     DEPARTURE = "departure"
 
+class PortCallEvent(BaseModel):
+
+    event: str
+
+    description: str
+
+    source: str
 
 class PortCallStatus(str, Enum):
-    """
-    The current status of the port call.
-    """
-
     CREATED = "created"
 
     ARRIVAL_PENDING = "arrival_pending"
@@ -33,7 +36,11 @@ class PortCallStatus(str, Enum):
 
     CORRECTION_REQUIRED = "correction_required"
     HUMAN_REVIEW = "human_review"
+
     INSPECTION_REQUIRED = "inspection_required"
+    INSPECTION_IN_PROGRESS = "inspection_in_progress"
+    INSPECTION_CLEARED = "inspection_cleared"
+    INSPECTION_REJECTED = "inspection_rejected"
 
     COMPLETED = "completed"
 
@@ -82,3 +89,22 @@ class PortCallState(BaseModel):
     # --------------------------------
 
     documents: list = Field(default_factory=list)
+
+    events: list[PortCallEvent] = Field(
+        default_factory=list
+    )
+    
+def add_event(
+    state: PortCallState,
+    *,
+    event: str,
+    description: str,
+    source: str,
+):
+    state.events.append(
+        PortCallEvent(
+            event=event,
+            description=description,
+            source=source,
+        )
+    )

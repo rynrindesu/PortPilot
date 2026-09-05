@@ -14,6 +14,15 @@ from PortPilot.workflow.state import (
     PortCallPhase,
     PortCallState,
     PortCallStatus,
+    add_event,
+)
+
+from PortPilot.compliance.risk import (
+    calculate_risk_score,
+)
+
+from PortPilot.compliance.inspection import (
+    determine_inspection_decision,
 )
 
 def process_port_call(
@@ -25,15 +34,12 @@ def process_port_call(
     Process the current stage of a port call.
 
     The orchestrator:
-        1. Runs the compliance engine.
-        2. Determines escalation.
-        3. Updates the port-call status.
-        4. Returns the results.
+        1. Runs compliance checks.
+        2. Calculates risk.
+        3. Determines inspection requirements.
+        4. Determines escalation.
+        5. Updates the port-call status.
     """
-
-    # --------------------------------
-    # 1. Build compliance PortCall
-    # --------------------------------
 
     port_call = PortCall(
         vessel_name=state.vessel_name,
@@ -52,18 +58,55 @@ def process_port_call(
         ),
     )
 
-    # --------------------------------
-    # 2. Run compliance
-    # --------------------------------
+    # --------------------------------------------------
+    # 1. Compliance
+    # --------------------------------------------------
 
     compliance_result = run_compliance_check(
         port_call,
         documents,
     )
 
-    # --------------------------------
-    # 3. Determine escalation
-    # --------------------------------
+    # --------------------------------------------------
+    # 2. Check document inconsistency
+    # --------------------------------------------------
+
+    document_inconsistency = any(
+        issue.code == "FIELD_MISMATCH"
+        for issue in compliance_result.issues
+    )
+
+    # --------------------------------------------------
+    # 3. Risk assessment
+    # --------------------------------------------------
+
+    risk_result = calculate_risk_score(
+        port_call,
+        compliance_status=(
+            compliance_result.status
+        ),
+        document_inconsistency=(
+            document_inconsistency
+        ),
+    )
+
+    # --------------------------------------------------
+    # 4. Inspection decision
+    # --------------------------------------------------
+
+    inspection_decision = (
+        determine_inspection_decision(
+            port_call,
+            risk_level=risk_result["risk_level"],
+            compliance_status=(
+                compliance_result.status
+            ),
+        )
+    )
+
+    # --------------------------------------------------
+    # 5. Escalation
+    # --------------------------------------------------
 
     escalation = determine_escalation(
         compliance_status=(
@@ -71,14 +114,22 @@ def process_port_call(
         ),
         physical_inspection_required=(
             physical_inspection_required
+            or inspection_decision["decision"]
+            == "inspection_required"
         ),
     )
 
-    # --------------------------------
-    # 4. Update workflow status
-    # --------------------------------
+    # --------------------------------------------------
+    # 6. Update state
+    # --------------------------------------------------
 
-    if escalation["action"] == "CORRECTION_REQUIRED":
+    if escalation["action"] == "INSPECTION_REQUIRED":
+
+        state.status = (
+            PortCallStatus.INSPECTION_REQUIRED
+        )
+
+    elif escalation["action"] == "CORRECTION_REQUIRED":
 
         state.status = (
             PortCallStatus.CORRECTION_REQUIRED
@@ -88,12 +139,6 @@ def process_port_call(
 
         state.status = (
             PortCallStatus.HUMAN_REVIEW
-        )
-
-    elif escalation["action"] == "INSPECTION_REQUIRED":
-
-        state.status = (
-            PortCallStatus.INSPECTION_REQUIRED
         )
 
     else:
@@ -116,19 +161,13 @@ def process_port_call(
                 PortCallStatus.DEPARTURE_CLEARED
             )
 
-    # --------------------------------
-    # 5. Store documents in state
-    # --------------------------------
-
     state.documents = documents
-
-    # --------------------------------
-    # 6. Return workflow result
-    # --------------------------------
 
     return {
         "port_call": state,
         "compliance": compliance_result,
+        "risk": risk_result,
+        "inspection": inspection_decision,
         "escalation": escalation,
     }
 
@@ -142,18 +181,25 @@ def advance_port_call(
     phase has been successfully cleared.
     """
 
-    # --------------------------------
-    # ARRIVAL → OPERATIONS
-    # --------------------------------
-
     if (
         state.phase.value == "arrival"
-        and state.status
-        == PortCallStatus.ARRIVAL_CLEARED
+        and state.status in (
+            PortCallStatus.ARRIVAL_CLEARED,
+            PortCallStatus.INSPECTION_CLEARED,
+        )
     ):
-
         state.phase = PortCallPhase.OPERATIONS
         state.status = PortCallStatus.OPERATIONS
+
+        add_event(
+            state,
+            event="PORT_CALL_ADVANCED",
+            description=(
+                "Arrival cleared. "
+                "Port call advanced to operations."
+            ),
+            source="workflow",
+        )
 
         return {
             "success": True,
@@ -163,18 +209,23 @@ def advance_port_call(
             ),
         }
 
-    # --------------------------------
-    # OPERATIONS → DEPARTURE
-    # --------------------------------
-
     if (
         state.phase.value == "operations"
         and state.status
         == PortCallStatus.OPERATIONS
     ):
-
         state.phase = PortCallPhase.DEPARTURE
         state.status = PortCallStatus.DEPARTURE_PENDING
+
+        add_event(
+            state,
+            event="PORT_CALL_ADVANCED",
+            description=(
+                "Operations completed. "
+                "Port call advanced to departure."
+            ),
+            source="workflow",
+        )
 
         return {
             "success": True,
@@ -184,17 +235,22 @@ def advance_port_call(
             ),
         }
 
-    # --------------------------------
-    # DEPARTURE → COMPLETED
-    # --------------------------------
-
     if (
         state.phase.value == "departure"
         and state.status
         == PortCallStatus.DEPARTURE_CLEARED
     ):
-
         state.status = PortCallStatus.COMPLETED
+
+        add_event(
+            state,
+            event="PORT_CALL_COMPLETED",
+            description=(
+                "Departure cleared. "
+                "Port call completed."
+            ),
+            source="workflow",
+        )
 
         return {
             "success": True,
@@ -203,10 +259,6 @@ def advance_port_call(
                 "Port call completed."
             ),
         }
-
-    # --------------------------------
-    # Cannot advance
-    # --------------------------------
 
     return {
         "success": False,

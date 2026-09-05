@@ -274,3 +274,55 @@ def test_cannot_advance_uncleared_arrival():
         == PortCallStatus.CORRECTION_REQUIRED
     )
 
+def test_inspection_cleared_advances_to_operations():
+
+    state = PortCallState(
+        port_call_id="PC-0003",
+        vessel_name="EVER INSPECTED",
+        imo_number="9876545",
+        call_sign="9V9999",
+        phase=PortCallPhase.ARRIVAL,
+        status=PortCallStatus.INSPECTION_CLEARED,
+        purpose_of_call="cargo",
+    )
+
+    result = advance_port_call(state)
+
+    assert result["success"] is True
+
+    assert (
+        state.phase
+        == PortCallPhase.OPERATIONS
+    )
+
+    assert (
+        state.status
+        == PortCallStatus.OPERATIONS
+    )
+    
+def test_inspection_rejected_cannot_advance():
+
+    state = PortCallState(
+        port_call_id="PC-0004",
+        vessel_name="EVER REJECTED",
+        imo_number="9876546",
+        call_sign="9V1111",
+        phase=PortCallPhase.ARRIVAL,
+        status=PortCallStatus.INSPECTION_REJECTED,
+        purpose_of_call="cargo",
+    )
+
+    result = advance_port_call(state)
+
+    assert result["success"] is False
+
+    assert (
+        state.phase
+        == PortCallPhase.ARRIVAL
+    )
+
+    assert (
+        state.status
+        == PortCallStatus.INSPECTION_REJECTED
+    )
+    

@@ -5,6 +5,7 @@ from PortPilot.workflow.state import (
     PortCallPhase,
     PortCallState,
     PortCallStatus,
+    add_event,
 )
 
 from PortPilot.workflow.orchestrator import (
@@ -16,6 +17,14 @@ from PortPilot.models.documents import (
     ExtractedDocument,
 )
 
+from PortPilot.compliance.inspection_workflow import (
+    start_inspection,
+    complete_inspection,
+)
+
+class CompleteInspectionRequest(BaseModel):
+    cleared: bool
+    findings: str | None = None
 
 router = APIRouter(
     prefix="/port-calls",
@@ -88,10 +97,17 @@ def create_port_call(
         ),
     )
 
+    add_event(
+        state,
+        event="PORT_CALL_CREATED",
+        description="Port call created.",
+        source="system",
+    )
+
     PORT_CALLS[
         request.port_call_id
     ] = state
-
+    
     return state
 
 
@@ -162,6 +178,16 @@ def check_port_call(
         state.documents,
     )
 
+    add_event(
+        state,
+        event="COMPLIANCE_CHECKED",
+        description=(
+            "Compliance check completed with status "
+            f"{result['compliance'].status}."
+        ),
+        source="compliance_engine",
+    )
+
     return result
 
 
@@ -188,3 +214,61 @@ def advance(
         "result": result,
         "state": state,
     }
+    
+@router.post("/{port_call_id}/inspection/start")
+def start_port_call_inspection(
+    port_call_id: str,
+):
+    state = PORT_CALLS.get(port_call_id)
+
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Port call not found.",
+        )
+
+    result = start_inspection(state)
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=result["message"],
+        )
+
+    return {
+        "port_call_id": port_call_id,
+        "result": result,
+        "state": state,
+    }
+    
+@router.post("/{port_call_id}/inspection/complete")
+def complete_port_call_inspection(
+    port_call_id: str,
+    request: CompleteInspectionRequest,
+):
+    state = PORT_CALLS.get(port_call_id)
+
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Port call not found.",
+        )
+
+    result = complete_inspection(
+        state,
+        cleared=request.cleared,
+        findings=request.findings,
+    )
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail=result["message"],
+        )
+
+    return {
+        "port_call_id": port_call_id,
+        "result": result,
+        "state": state,
+    }
+    
