@@ -40,7 +40,7 @@ def _print_message(message):
         return
     content = getattr(message, "content", None)
     if content:
-        text = content if isinstance(content, str) else json.dumps(content, default=_render)
+        text = content if isinstance(content, str) else json.dumps(content, default=_render, ensure_ascii=False)
         print(f"  [{role}] {text[:800]}")
 
 
@@ -59,7 +59,7 @@ def main() -> int:
         return 1
 
     print("Current schedule:")
-    print(json.dumps(schedule, default=_render, indent=2))
+    print(json.dumps(schedule, default=_render, indent=2, ensure_ascii=False))
 
     event = {
         "event": "ETA_CHANGED",
@@ -81,7 +81,7 @@ def main() -> int:
         _print_message(message)
 
     print("\n--- Final result ---")
-    print(json.dumps(result["final_result"], default=_render, indent=2))
+    print(json.dumps(result["final_result"], default=_render, indent=2, ensure_ascii=False))
 
     return 0
 
