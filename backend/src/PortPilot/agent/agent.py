@@ -13,6 +13,7 @@ from PortPilot.agent.graph import (
     AgentState,
     create_chatbot_node,
     finalize_node,
+    initial_state,
     process_tool_result_node,
     route_after_chatbot,
     route_after_tool_result,
@@ -21,6 +22,7 @@ from PortPilot.agent.graph import (
     validate_tool_call_node,
     verify_node,
 )
+from PortPilot.monitoring.monitor_service import retry_unconfirmed_operations
 
 logger = logging.getLogger(__name__)
 
@@ -196,3 +198,74 @@ def build_graph(model, system_prompt):
     graph_builder.add_edge("finalize", END)
 
     return graph_builder.compile()
+
+
+# Build the graph only when first needed, then cache it for reuse.
+# This avoids initialization during import and rebuilding it for each vessel.
+_COMPILED_GRAPH = None
+
+def _get_compiled_graph():
+    """Return the cached compiled agent graph, building it on first use."""
+    global _COMPILED_GRAPH
+    
+    if _COMPILED_GRAPH is None:
+        logger.info("Building the agent graph (provider=%s)", PROVIDER)
+        _COMPILED_GRAPH = build_graph(create_model(), SYSTEM_PROMPT)
+    return _COMPILED_GRAPH
+
+
+def _process_eta_change(event: dict) -> dict:
+    """Convert one ETA_CHANGED event into graph state, 
+    run the agent, and return the final result.
+    """
+    vessel_name = event["vessel_name"]
+    imo_number = event["imo_number"]
+
+    logger.info("Processing ETA_CHANGED for %s (%s)", vessel_name, imo_number)
+
+    state = initial_state(event)
+    result_state = _get_compiled_graph().invoke(state)
+    final_result = result_state["final_result"]
+
+    logger.info(
+        "%s (%s) -> outcome=%s",
+        vessel_name, imo_number, final_result.get("outcome"),
+    )
+    return final_result
+
+
+def _retry_unconfirmed_vessel(event: dict) -> dict:
+    """Retry one vessel's unconfirmed allocations using deterministic scheduling.
+    """
+    vessel_name = event["vessel_name"]
+    imo_number = event["imo_number"]
+
+    logger.info("Retrying unconfirmed vessel %s (%s)", vessel_name, imo_number)
+
+    result = retry_unconfirmed_operations(vessel_name, imo_number)
+
+    logger.info(
+        "%s (%s) -> outcome=%s",
+        vessel_name, imo_number, result.get("outcome"),
+    )
+    return result
+
+
+def _deduplicate_events(events: list) -> list:
+    """Keep only the first event per vessel because the API may return duplicate
+    vessels, which could otherwise cause the same schedule to be processed twice.
+    """
+    seen = set()
+    deduplicated = []
+    for event in events:
+        key = (event["vessel_name"], event["imo_number"])
+        if key in seen:
+            logger.warning(
+                "Duplicate event for %s (%s) in this poll - keeping only the "
+                "first (event=%s)",
+                event["vessel_name"], event["imo_number"], event.get("event"),
+            )
+            continue
+        seen.add(key)
+        deduplicated.append(event)
+    return deduplicated
