@@ -790,6 +790,19 @@ def finalize_node(state: AgentState) -> dict:
         else:
             agent_response = "The agent could not complete the scheduling workflow."
 
+    # The model's own prose is not a reliable record of what was actually
+    # escalated - it can (and has) claimed a resource was flagged for review
+    # without ever making that tool call. For the two outcomes where that
+    # matters, append the real, state-derived list so a mismatch between the
+    # narrative and reality is always visible rather than silently trusted.
+    if outcome in ("pending_review", "unable_to_resolve"):
+        flagged_resources = state.get("flagged_resources", [])
+        agent_response = (
+            f"{agent_response} "
+            f"[System record: resource type(s) actually flagged for review "
+            f"this run: {flagged_resources if flagged_resources else 'none'}.]"
+        )
+
     final_result = {
         "outcome": outcome,
         "vessel_name": state.get("vessel_name"),
