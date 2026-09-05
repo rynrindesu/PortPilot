@@ -22,7 +22,10 @@ from PortPilot.agent.graph import (
     validate_tool_call_node,
     verify_node,
 )
-from PortPilot.monitoring.monitor_service import retry_unconfirmed_operations
+from PortPilot.monitoring.monitor_service import (
+    monitor_vessels,
+    retry_unconfirmed_operations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -283,3 +286,64 @@ def _deduplicate_events(events: list) -> list:
         by_key[key] = event
 
     return [by_key[key] for key in order]
+
+
+def run_monitoring_cycle(date) -> dict:
+    """Poll OCEANS-X and process all resulting scheduling events.
+
+    ETA changes are processed first through the agent graph. Once they are
+    complete, newly discovered vessels with unconfirmed allocations are
+    retried using deterministic scheduling.
+
+    Each vessel is processed independently so one failure does not stop
+    the rest of the monitoring cycle.
+    """
+    changes = _deduplicate_events(monitor_vessels(date))
+
+    eta_change_events = [event for event in changes if event["event"] == "ETA_CHANGED"]
+    unconfirmed_events = [
+        event for event in changes
+        if event["event"] == "NEW_VESSEL_DISCOVERED"
+        and any(info["status"] == "unconfirmed" for info in event["assigned"].values())
+    ]
+
+    errors = []
+
+    eta_change_results = []
+    for event in eta_change_events:
+        try:
+            eta_change_results.append(_process_eta_change(event))
+        except Exception as error:
+            logger.exception(
+                "Failed to process ETA_CHANGED for %s (%s)",
+                event["vessel_name"], event["imo_number"],
+            )
+            errors.append({
+                "vessel_name": event["vessel_name"],
+                "imo_number": event["imo_number"],
+                "phase": "eta_change",
+                "error": str(error),
+            })
+
+    unconfirmed_retry_results = []
+    for event in unconfirmed_events:
+        try:
+            unconfirmed_retry_results.append(_retry_unconfirmed_vessel(event))
+        except Exception as error:
+            logger.exception(
+                "Failed to retry unconfirmed vessel %s (%s)",
+                event["vessel_name"], event["imo_number"],
+            )
+            errors.append({
+                "vessel_name": event["vessel_name"],
+                "imo_number": event["imo_number"],
+                "phase": "unconfirmed_retry",
+                "error": str(error),
+            })
+
+    return {
+        "eta_change_results": eta_change_results,
+        "unconfirmed_retry_results": unconfirmed_retry_results,
+        "raw_changes": changes,
+        "errors": errors,
+    }
