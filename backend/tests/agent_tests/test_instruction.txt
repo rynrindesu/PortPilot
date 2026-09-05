@@ -1,0 +1,59 @@
+HOW TO RUN THE MINI LIVE TESTS
+===============================
+
+Run all commands from the repository root.
+
+READ-ONLY scripts are safe. LIVE scripts use the real LLM and may write to
+Supabase, so only use vessels you are prepared to modify.
+
+
+1. CHECK SETUP (READ-ONLY)
+---------------------------
+Checks that Groq and tool calling work.
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/check_groq_setup.py
+
+
+2. FIND TEST VESSELS (READ-ONLY)
+---------------------------------
+Finds vessels from the live OCEANS-X feed that can exercise:
+  - NEW: new-vessel assignment / possible unconfirmed retry
+  - ETA_DRIFT: real ETA change through the agent graph
+
+Run this shortly before the live test because the feed and freeze window change.
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/find_live_test_vessels.py 2026-09-05
+
+
+3. PREVIEW OPTIONS (OPTIONAL, READ-ONLY)
+-----------------------------------------
+Shows which scheduling strategies are currently valid without calling the LLM
+or writing to the database.
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/preview_strategies.py \
+        "VESSEL NAME" IMO_NUMBER 2026-09-06T10:00:00+00:00
+
+
+4. RUN LIVE MONITORING TEST (LIVE / WRITES)
+--------------------------------------------
+Runs the real production monitoring cycle using only the selected vessels.
+This includes real OCEANS-X data, ETA detection, agent calls, scheduling,
+retries, database writes, and verification.
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/run_monitoring_cycle_test.py \
+        2026-09-05 \
+        "VESSEL ONE" 1234567 \
+        "VESSEL TWO" 7654321
+
+For detailed debugging of one manually chosen ETA change:
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/run_one_eta_change.py \
+        "VESSEL NAME" IMO_NUMBER 2026-09-06T10:00:00+00:00
+
+
+5. CHECK THE RESULT (READ-ONLY)
+--------------------------------
+Reads the vessel's actual persisted schedule after a live test.
+
+    PYTHONPATH=backend/src python backend/tests/agent_tests/check_vessel_schedule.py \
+        "VESSEL NAME" IMO_NUMBER
