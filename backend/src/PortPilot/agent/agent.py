@@ -146,8 +146,27 @@ Your job is done as soon as one of the following happens:
   each affected resource_type, citing the specific reason get_ranked_options
   gave you.
 
-Once you reach one of these, give a plain final answer summarizing what
-happened and why. Do not call any more tools after that.
+Once you reach one of these, give the final answer immediately. Do
+not call any more tools.
+
+FINAL ANSWER FORMAT
+Write 2 to 4 concise sentences in plain prose. Do not use markdown tables,
+headers, or bullet lists.
+
+State:
+- the vessel name and outcome;
+- which scheduling strategy was used (retain_current_allocation,
+  shift_same_resources, alternative_resources, or reallocate_one_vessel),
+  if an option was selected;
+- for a successful reschedule, only the resources that changed and the
+  reason for the change;
+- for no action, that the existing schedule was retained and why;
+- for escalation or failure, what could not be resolved and what happens
+  next;
+- whether verification succeeded, if a schedule change was applied.
+
+Do not include unchanged resource details, option rankings, option IDs,
+tool calls, iteration counts, or other internal workflow details.
 """
 
 
