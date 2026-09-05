@@ -178,16 +178,6 @@ def check_port_call(
         state.documents,
     )
 
-    add_event(
-        state,
-        event="COMPLIANCE_CHECKED",
-        description=(
-            "Compliance check completed with status "
-            f"{result['compliance'].status}."
-        ),
-        source="compliance_engine",
-    )
-
     return result
 
 

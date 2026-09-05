@@ -66,6 +66,16 @@ def process_port_call(
         port_call,
         documents,
     )
+    
+    add_event(
+        state,
+        event="COMPLIANCE_CHECKED",
+        description=(
+            "Compliance check completed with status "
+            f"{compliance_result.status}."
+        ),
+        source="compliance_engine",
+    )
 
     # --------------------------------------------------
     # 2. Check document inconsistency
