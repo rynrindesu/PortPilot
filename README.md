@@ -5,9 +5,10 @@ PortPilot is an agentic AI prototype for maritime port-call operations in Singap
 ## Services
 
 PortPilot is being organised as two independent services. They have separate
-Python environments, configuration files, dependencies, and deployment
-boundaries. They will communicate through explicit APIs or events—not by
-importing Python code from one another.
+Python environments, dependencies, and deployment boundaries, while local
+development uses one root-level `.env` file for shared configuration. They
+will communicate through explicit APIs or events—not by importing Python code
+from one another.
 
 | Service | Status | Responsibility |
 | --- | --- | --- |
@@ -56,35 +57,6 @@ Initial or existing assignment handling
   - Groq API credentials; or
   - AWS credentials and Amazon Bedrock access
 
-### Configure the service
-
-Create `rescheduling_agent/.env` and provide the credentials supplied by the
-project owner. Keep this file private; it is excluded from version control.
-
-```dotenv
-# OCEANS-X
-OCEANX_VESSELS_DUE_TO_ARRIVE_API_KEY=
-
-# Supabase/PostgreSQL
-SUPABASE_DB_URL=
-SUPABASE_DB_PASSWORD=
-
-# Automation: true by default
-PORTPILOT_AUTOMATION_ENABLED=true
-
-# LLM provider: groq or bedrock
-LLM_PROVIDER=groq
-GROQ_API_KEY=
-GROQ_MODEL=openai/gpt-oss-20b
-
-# Required when LLM_PROVIDER=bedrock
-BEDROCK_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
-AWS_DEFAULT_REGION=us-east-1
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_SESSION_TOKEN=
-```
-
 ### Install and run
 
 Run these commands from the repository root:
@@ -125,7 +97,7 @@ PYTHONPATH=src python -c "from PortPilot.main import app; print(app.title)"
 When the FastAPI application is running, the rescheduling service schedules
 recurring jobs using Singapore time (`Asia/Singapore`). Automation is enabled
 by default. Set `PORTPILOT_AUTOMATION_ENABLED=false` in
-`rescheduling_agent/.env` for local API work or maintenance.
+the root `.env` file for local API work or maintenance.
 
 #### 21:00 — Stage the next operating day
 
@@ -156,7 +128,7 @@ staging, initialization, hourly monitoring, and recovery cannot overlap.
 Run one FastAPI worker for this prototype. The latest completed scheduler
 results are held in process memory and are available at `GET /automation/status`.
 
-## OCR Serivce and Port-Ops Agent 
+## OCR Service and Port-Ops Agent
 
 The OCR service processes uploaded vessel documents and converts their
 contents into structured data for downstream validation and compliance
@@ -179,8 +151,10 @@ progression through arrival, operations, and departure.
 
 ### Configure the service
 
-Create `port_ops_agent/.env` and provide the credentials supplied by the
-project owner. Keep this file private; it is excluded from version control.
+Add the Port-Ops credentials to the same root `.env` file used by the
+rescheduling service. Keep this file private; it is excluded from version
+control. Run the service from `port_ops_agent/`; its configuration loader
+discovers the root `.env` file.
 
 ```dotenv
 # OpenAI
@@ -215,8 +189,8 @@ python -m pytest -v
 PortPilot/
 ├── README.md
 ├── .gitignore
+├── .env                      # Shared local configuration; not committed
 ├── rescheduling_agent/       # Current runnable service
-│   ├── .env                  # Local only; not committed
 │   ├── .venv/                # Local only; not committed
 │   ├── pyproject.toml
 │   ├── requirements.txt
@@ -228,8 +202,7 @@ PortPilot/
 │   │   └── monitoring/
 │   └── tests/
 │
-└── port_ops_agent/                # Planned service; not yet added
-    ├── .env
+└── port_ops_agent/                # OCR and port-call service
     ├── .venv/
     ├── src/
     └── tests/
