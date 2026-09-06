@@ -7,10 +7,9 @@ objects and then passed through PortPilot's actual validation, routing,
 result-processing, verification, and finalization functions.
 
 Database-changing tools are never invoked. Their expected result messages are
-simulated, and post-write database reads are mocked. The read-free
-``complete_no_action`` tool is invoked directly so its real output contract is
-covered. This makes the tests deterministic and safe while accurately testing
-the protocol between the future model, LangGraph, and PortPilot's tools.
+simulated, and post-write database reads are mocked. This makes the tests
+deterministic and safe while accurately testing the protocol between the future
+model, LangGraph, and PortPilot's tools.
 
 Run from the repository root:
 
@@ -43,9 +42,6 @@ from PortPilot.agent.graph import (
     validate_tool_call_node,
     verify_node,
 )
-from PortPilot.agent.tools import complete_no_action
-
-
 OUTPUT_PATH = Path(__file__).with_name("graph_tools_output.txt")
 SAMPLE_OUTCOMES: dict[str, dict] = {}
 
@@ -204,7 +200,7 @@ class GraphToolsAISimulationTests(unittest.TestCase):
         self,
         state: dict,
         ranked_result: dict,
-    ) -> None:
+    ) -> str:
         """Simulate the normal inspect-then-rank beginning of a graph run."""
 
         route = self._simulate_ai_tool_turn(
@@ -225,7 +221,16 @@ class GraphToolsAISimulationTests(unittest.TestCase):
             },
             ranked_result,
         )
-        self.assertEqual(route, "chatbot")
+        expected_route = (
+            "finalize"
+            if any(
+                option.get("strategy") == "retain_current_allocation"
+                for option in ranked_result.get("options", [])
+            )
+            else "chatbot"
+        )
+        self.assertEqual(route, expected_route)
+        return route
 
     def _record(self, name: str, result: dict) -> None:
         SAMPLE_OUTCOMES[name] = copy.deepcopy(result)
@@ -253,7 +258,7 @@ class GraphToolsAISimulationTests(unittest.TestCase):
             state,
             "reschedule_operations",
             {
-                "option": selected_option,
+                "option_id": selected_option["option_id"],
                 "reason": "Rank 1 minimizes affected vessels and schedule movement.",
             },
             {
@@ -308,30 +313,12 @@ class GraphToolsAISimulationTests(unittest.TestCase):
             "options": [retain_option],
         })
 
-        # Step 2: call the real read-free completion tool. Graph validation
-        # proves this option ID belongs to a valid retain option.
-        reason = "The existing confirmed allocations remain feasible for the revised ETA."
-        real_tool_result = complete_no_action.invoke({
-            "option_id": "retain_current_allocation",
-            "reason": reason,
-        })
-        route = self._simulate_ai_tool_turn(
-            state,
-            "complete_no_action",
-            {
-                "option_id": "retain_current_allocation",
-                "reason": reason,
-            },
-            real_tool_result,
-        )
-        self.assertEqual(route, "chatbot")
+        # Step 2: deterministic processing recognizes the retain option and
+        # finishes without another model turn or database write.
         self.assertFalse(state["write_attempted"])
 
-        # Step 3: simulated AI explains why no operational write was needed.
-        result = self._simulate_final_ai_response(
-            state,
-            "The current allocations remain valid, so no schedule change was required.",
-        )
+        # Step 3: finalization derives a stable no-action response from state.
+        result = finalize_node(state)["final_result"]
         self.assertEqual(result["outcome"], "no_action")
         self._record("no_action", result)
 
@@ -432,7 +419,7 @@ class GraphToolsAISimulationTests(unittest.TestCase):
             state,
             "reschedule_operations",
             {
-                "option": selected_option,
+                "option_id": selected_option["option_id"],
                 "reason": "This is the only valid resource combination.",
             },
             {
@@ -492,7 +479,7 @@ RATIONALE
 Scripted decisions isolate the graph contract from model randomness, API
 availability, cost, and prompt variation. Database writes are represented by
 controlled results, so outcome logic can be tested without altering operational
-data. The complete_no_action tool is safe and is executed for real.
+data.
 
 EVALUATION OF ACCURACY
 ----------------------

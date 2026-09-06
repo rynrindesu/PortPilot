@@ -98,9 +98,9 @@ SEQUENCE
    generated, validated, and ranked scheduling options. Never invent a berth,
    pilot, tug, resource ID, or time yourself - only use values that appear in
    a returned option.
-3. When calling reschedule_operations, pass the complete option object
-   exactly as returned by get_ranked_options - no field added, removed, or
-   changed - together with a non-empty reason explaining your choice.
+3. When calling reschedule_operations, pass only the option_id exactly as
+   returned by get_ranked_options, together with a non-empty reason explaining
+   your choice. The application retrieves the complete option from graph state.
 
 PRIORITIES
 Options are already ranked best-to-worst by a fixed, deterministic order
@@ -116,6 +116,13 @@ PROHIBITED
 - Do not call the same tool with identical arguments more than twice during
   one graph run. Repeated calls should only be made when the scheduling state
   may have changed.
+
+STRICT TOOL-CALLING FORMAT
+When calling reschedule_operations, issue exactly one native tool call.
+The arguments must be a valid JSON object in this form:
+{"option_id": "<option_id>", "reason": "<reason>"}
+Do not copy the option's vessels, resources, allocations, or timestamps into
+the tool call.
 
 RETRY POLICY
 If reschedule_operations fails because the selected option is no longer valid,
@@ -217,7 +224,7 @@ def build_graph(model, system_prompt):
     graph_builder.add_conditional_edges(
         "process_tool_result",
         route_after_tool_result,
-        {"verify": "verify", "chatbot": "chatbot"},
+        {"verify": "verify", "chatbot": "chatbot", "finalize": "finalize"},
     )
 
     # Return verification to the model so its final response is based on the

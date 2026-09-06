@@ -10,8 +10,10 @@ Five tools are exposed to the agent:
 
 import json
 from datetime import datetime
+from typing import Annotated
 
 from langchain_core.tools import tool
+from langgraph.prebuilt import InjectedState
 
 from PortPilot.database.postgres import (
     get_vessel_schedule as read_vessel_schedule,
@@ -336,15 +338,20 @@ def apply_schedule_option(option, reason, execution_mode="autonomous"):
 
 
 @tool
-def reschedule_operations(option: dict, reason: str) -> str:
+def reschedule_operations(
+    option_id: str,
+    reason: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
     """Apply a ranked scheduling option chosen from get_ranked_options.
 
     Review the ranked options and their scheduling priority trade-offs before
     selecting an option. Treat the deterministic ranking as the primary
     decision guide and normally select the highest-ranked valid option.
 
-    Use only an option returned by get_ranked_options and do not modify its
-    scheduling values.
+    Pass only the option_id returned by get_ranked_options. The complete option
+    is retrieved from this workflow's state so its scheduling values cannot be
+    changed by the model.
 
     If selecting a lower-ranked option, provide a clear reason for doing so.
     Explain the selection using the relevant scheduling priorities and
@@ -353,12 +360,36 @@ def reschedule_operations(option: dict, reason: str) -> str:
     The selected option is revalidated against the latest schedule before
     all changes are applied atomically.
     """
+    ranked_options = state.get("ranked_result", {}).get("options", [])
+    option = next(
+        (
+            candidate
+            for candidate in ranked_options
+            if candidate.get("option_id") == option_id
+        ),
+        None,
+    )
+
+    if option is None:
+        return _json({
+            "success": False,
+            "option_id": option_id,
+            "message": "The selected option is not available in this workflow.",
+        })
+
+    if option.get("strategy") == "retain_current_allocation":
+        return _json({
+            "success": False,
+            "option_id": option_id,
+            "message": "Retaining the current allocation does not require a write.",
+        })
+
     try:
         parsed_option = _parse_option_datetimes(option)
     except ValueError as error:
         return _json({
             "success": False,
-            "option_id": option.get("option_id") if isinstance(option, dict) else None,
+            "option_id": option_id,
             "message": f"Malformed option: {error}",
         })
 

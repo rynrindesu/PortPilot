@@ -5,6 +5,11 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 from unittest.mock import patch
 
+from langchain_core.messages import AIMessage
+from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
+
+from PortPilot.agent.graph import AgentState
 from PortPilot.agent.tools import apply_schedule_option, reschedule_operations
 
 T0 = datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc)
@@ -110,9 +115,9 @@ class ApplyScheduleOptionTests(TestCase):
         # conflicts (mocked below, not via the cursor), then reads the old
         # values, updates, and logs.
         fake_cursor = _FakeCursor([
-            ("berth",), ("B00", T0, T0, 15),
-            ("pilot",), ("P00", T0, T0, 15),
-            ("tug",), ("T00", T0, T0, 15),
+            ("berth",), ("B00", T0, T0, 15, "confirmed"),
+            ("pilot",), ("P00", T0, T0, 15, "confirmed"),
+            ("tug",), ("T00", T0, T0, 15, "confirmed"),
         ])
         fake_connection = _FakeConnection(fake_cursor)
 
@@ -142,7 +147,9 @@ class ApplyScheduleOptionTests(TestCase):
         # Berth locks and applies fine; tug's resource lock succeeds but its
         # old-value row is missing - should abort and roll back, not leave
         # the berth UPDATE applied on its own.
-        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15), ("tug",), None])
+        fake_cursor = _FakeCursor([
+            ("berth",), ("B00", T0, T0, 15, "confirmed"), ("tug",), None,
+        ])
         fake_connection = _FakeConnection(fake_cursor)
 
         with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
@@ -169,7 +176,10 @@ class ApplyScheduleOptionTests(TestCase):
             },
         }]
         option = _option("opt_1", changes)
-        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15), ("tug",), ("T00", T0, T0, 15)])
+        fake_cursor = _FakeCursor([
+            ("berth",), ("B00", T0, T0, 15, "confirmed"),
+            ("tug",), ("T00", T0, T0, 15, "confirmed"),
+        ])
         fake_connection = _FakeConnection(fake_cursor)
 
         with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
@@ -234,7 +244,9 @@ class ApplyScheduleOptionTests(TestCase):
         }]
         option = _option("opt_1", changes, rank=2)
         # Old row on record: different resource, different (shorter) window.
-        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0 + timedelta(minutes=30), 20)])
+        fake_cursor = _FakeCursor([
+            ("berth",), ("B00", T0, T0 + timedelta(minutes=30), 20, "confirmed"),
+        ])
         fake_connection = _FakeConnection(fake_cursor)
 
         with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
@@ -274,7 +286,7 @@ class ApplyScheduleOptionTests(TestCase):
             "vessel_name": "TEST VESSEL A", "imo_number": "1111111",
             "allocations": {"berth": {"resource_id": "B01", "start_time": T0, "end_time": T0, "buffer_minutes": 15}},
         }])
-        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15)])
+        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15, "confirmed")])
         fake_connection = _FakeConnection(fake_cursor)
 
         with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
@@ -295,7 +307,7 @@ class ApplyScheduleOptionTests(TestCase):
             "allocations": {"berth": {"resource_id": "B01", "start_time": T0, "end_time": T0, "buffer_minutes": 15}},
         }]
         option = _option("opt_1", changes)
-        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15)])
+        fake_cursor = _FakeCursor([("berth",), ("B00", T0, T0, 15, "confirmed")])
         fake_connection = _FakeConnection(fake_cursor)
 
         with patch("PortPilot.agent.tools.filter_valid_options", return_value=([option], [])), \
@@ -327,8 +339,8 @@ class ApplyScheduleOptionTests(TestCase):
         revalidated_option = {**original_option, "changes": revalidated_changes}
 
         fake_cursor = _FakeCursor([
-            ("berth",), ("B00", T0, T0, 15),
-            ("pilot",), ("P00", T0, T0, 15),
+            ("berth",), ("B00", T0, T0, 15, "confirmed"),
+            ("pilot",), ("P00", T0, T0, 15, "confirmed"),
         ])
         fake_connection = _FakeConnection(fake_cursor)
 
@@ -346,10 +358,47 @@ class ApplyScheduleOptionTests(TestCase):
 
 
 class RescheduleOperationsToolTests(TestCase):
-    """The @tool wrapper - just parses datetimes and delegates."""
+    """The tool resolves model selections against authoritative graph state."""
 
-    def test_parses_iso_strings_and_applies(self):
-        option_as_llm_sees_it = json.loads(json.dumps({
+    def test_tool_schema_exposes_only_option_id_and_reason(self):
+        properties = reschedule_operations.tool_call_schema.model_json_schema()["properties"]
+
+        self.assertEqual(set(properties), {"option_id", "reason"})
+
+    def test_compiled_tool_node_injects_ranked_option_state(self):
+        ranked_option = _option("alt_1", [])
+        builder = StateGraph(AgentState)
+        builder.add_node("tools", ToolNode([reschedule_operations]))
+        builder.set_entry_point("tools")
+        builder.add_edge("tools", END)
+        graph = builder.compile()
+
+        with patch(
+            "PortPilot.agent.tools.apply_schedule_option",
+            return_value={"success": True, "option_id": "alt_1", "changes_applied": []},
+        ) as mock_apply:
+            result_state = graph.invoke({
+                "messages": [AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": "reschedule_operations",
+                        "args": {
+                            "option_id": "alt_1",
+                            "reason": "picked top option",
+                        },
+                        "id": "selection-1",
+                        "type": "tool_call",
+                    }],
+                )],
+                "ranked_result": {"options": [ranked_option]},
+            })
+
+        result = json.loads(result_state["messages"][-1].content)
+        self.assertTrue(result["success"])
+        self.assertEqual(mock_apply.call_args[0][0], ranked_option)
+
+    def test_resolves_option_from_state_parses_iso_strings_and_applies(self):
+        ranked_option = json.loads(json.dumps({
             "option_id": "alt_1",
             "target_eta": T0.isoformat(),
             "changes": [{
@@ -368,10 +417,11 @@ class RescheduleOperationsToolTests(TestCase):
             "PortPilot.agent.tools.apply_schedule_option",
             return_value={"success": True, "option_id": "alt_1", "changes_applied": []},
         ) as mock_apply:
-            raw_result = reschedule_operations.invoke({
-                "option": option_as_llm_sees_it,
-                "reason": "picked top option",
-            })
+            raw_result = reschedule_operations.func(
+                option_id="alt_1",
+                reason="picked top option",
+                state={"ranked_result": {"options": [ranked_option]}},
+            )
 
         result = json.loads(raw_result)
         self.assertTrue(result["success"])
@@ -383,7 +433,24 @@ class RescheduleOperationsToolTests(TestCase):
 
     def test_malformed_datetime_fails_cleanly(self):
         bad_option = {"option_id": "alt_1", "target_eta": "not-a-real-date", "changes": []}
-        raw_result = reschedule_operations.invoke({"option": bad_option, "reason": "test"})
+        raw_result = reschedule_operations.func(
+            option_id="alt_1",
+            reason="test",
+            state={"ranked_result": {"options": [bad_option]}},
+        )
         result = json.loads(raw_result)
         self.assertFalse(result["success"])
         self.assertIn("Malformed option", result["message"])
+
+    def test_unknown_option_id_fails_without_applying(self):
+        with patch("PortPilot.agent.tools.apply_schedule_option") as mock_apply:
+            raw_result = reschedule_operations.func(
+                option_id="missing_option",
+                reason="test",
+                state={"ranked_result": {"options": []}},
+            )
+
+        result = json.loads(raw_result)
+        self.assertFalse(result["success"])
+        self.assertIn("not available", result["message"])
+        mock_apply.assert_not_called()

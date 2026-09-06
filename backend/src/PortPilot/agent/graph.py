@@ -369,13 +369,13 @@ def validate_tool_call_node(state: AgentState) -> dict:
                 "Ranked options must be retrieved before rescheduling.",
             )
 
-        submitted_option = arguments.get("option")
+        option_id = arguments.get("option_id")
 
-        if not isinstance(submitted_option, dict):
+        if not isinstance(option_id, str) or not option_id.strip():
             return _reject_tool_call(
                 state,
                 tool_call,
-                "reschedule_operations requires a complete ranked option.",
+                "reschedule_operations requires an option_id.",
             )
 
         ranked_options = ranked_result.get("options", [])
@@ -384,7 +384,7 @@ def validate_tool_call_node(state: AgentState) -> dict:
             (
                 option
                 for option in ranked_options
-                if _canonical_option(option) == _canonical_option(submitted_option)
+                if option.get("option_id") == option_id
             ),
             None,
         )
@@ -393,8 +393,16 @@ def validate_tool_call_node(state: AgentState) -> dict:
             return _reject_tool_call(
                 state,
                 tool_call,
-                "The submitted schedule option does not exactly match an option "
-                "returned by get_ranked_options.",
+                "The submitted option_id does not match an option returned by "
+                "get_ranked_options.",
+            )
+
+        if matching_option.get("strategy") == "retain_current_allocation":
+            return _reject_tool_call(
+                state,
+                tool_call,
+                "retain_current_allocation requires no database write. "
+                "Use complete_no_action to finish with a no_action outcome.",
             )
 
         reason = arguments.get("reason", "")
@@ -405,6 +413,13 @@ def validate_tool_call_node(state: AgentState) -> dict:
                 tool_call,
                 "A reason is required when applying a schedule option.",
             )
+
+        return {
+            "tool_call_valid": True,
+            "selected_option": matching_option,
+            "selected_option_id": option_id,
+            "decision_reason": reason.strip(),
+        }
 
     if tool_name == "flag_for_review":
         resource_type = arguments.get("resource_type")
@@ -529,6 +544,25 @@ def process_tool_result_node(state: AgentState) -> dict:
     elif tool_name == "get_ranked_options":
         update["ranked_result"] = result
 
+        retain_option = next(
+            (
+                option
+                for option in result.get("options", [])
+                if option.get("strategy") == "retain_current_allocation"
+            ),
+            None,
+        )
+
+        # Deterministic validation for when current allocation is retained
+        if retain_option is not None:
+            update["outcome"] = "no_action"
+            update["selected_option"] = retain_option
+            update["selected_option_id"] = retain_option["option_id"]
+            update["decision_reason"] = (
+                "The existing berth, pilot, and tug allocations remain "
+                "feasible for the revised ETA."
+            )
+
     elif tool_name == "reschedule_operations":
         update["write_attempted"] = True
         update["write_result"] = result
@@ -537,12 +571,8 @@ def process_tool_result_node(state: AgentState) -> dict:
             messages,
             tool_message.tool_call_id,
         )
-        selected_option = arguments.get("option")
-
-        if isinstance(selected_option, dict):
-            update["selected_option"] = selected_option
-            update["selected_option_id"] = selected_option.get("option_id")
-            update["decision_reason"] = arguments.get("reason", "")
+        update["selected_option_id"] = arguments.get("option_id")
+        update["decision_reason"] = arguments.get("reason", "")
 
     elif tool_name == "flag_for_review":
         if result.get("success"):
@@ -564,8 +594,11 @@ def process_tool_result_node(state: AgentState) -> dict:
 
 def route_after_tool_result(
     state: AgentState,
-    ) -> Literal["verify", "chatbot"]:
+    ) -> Literal["verify", "chatbot", "finalize"]:
     """Verify successful schedule writes; return all other results to the agent."""
+
+    if state.get("outcome") == "no_action":
+        return "finalize"
 
     if (
         state.get("last_tool_name") == "reschedule_operations"
@@ -773,7 +806,16 @@ def finalize_node(state: AgentState) -> dict:
     """Build the stable result returned by the completed graph."""
 
     outcome = _determine_outcome(state)
-    agent_response = _last_agent_response(state)
+
+    if outcome == "no_action":
+        vessel_name = state.get("vessel_name") or "The vessel"
+        agent_response = (
+            f"{vessel_name}: no action required. The existing berth, pilot, "
+            "and tug allocations remain feasible for the revised ETA. "
+            "No schedule changes were applied."
+        )
+    else:
+        agent_response = _last_agent_response(state)
 
     if not agent_response:
         if outcome == "rescheduled":
@@ -782,11 +824,6 @@ def finalize_node(state: AgentState) -> dict:
             agent_response = "The unresolved allocations were flagged for human review."
         elif outcome == "failed":
             agent_response = "The scheduling workflow failed."
-        elif outcome == "no_action":
-            agent_response = (
-                "The existing allocations remain feasible; "
-                "no schedule change was required."
-            )
         else:
             agent_response = "The agent could not complete the scheduling workflow."
 
