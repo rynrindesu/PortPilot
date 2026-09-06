@@ -1,6 +1,8 @@
 import atexit
 import os
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 import psycopg
 from dotenv import load_dotenv
@@ -10,6 +12,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("SUPABASE_DB_URL")
 DATABASE_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD")
+SINGAPORE_TIMEZONE = ZoneInfo("Asia/Singapore")
 
 
 # Reuse database connections instead of opening a new connection for every query.
@@ -61,7 +64,9 @@ def get_vessel_state(vessel_name, imo_number):
                     last_eta_received_at,
                     last_updated
                 FROM vessel_state
-                WHERE vessel_name = %s AND imo_number = %s
+                WHERE vessel_name = %s
+                  AND imo_number = %s
+                  AND lifecycle_status = 'active'
                 """,
                 (vessel_name, imo_number)
             )
@@ -105,6 +110,7 @@ def get_all_vessel_states():
                     location_to,
                     last_updated
                 FROM vessel_state
+                WHERE lifecycle_status = 'active'
                 """
             )
 
@@ -139,6 +145,16 @@ def _metadata_values(vessel):
     )
 
 
+def _operational_date(incoming_eta) -> date:
+    """Return the vessel's Singapore-local operating date."""
+
+    if isinstance(incoming_eta, str):
+        incoming_eta = datetime.fromisoformat(incoming_eta.replace("Z", "+00:00"))
+    if incoming_eta.tzinfo is None:
+        incoming_eta = incoming_eta.replace(tzinfo=timezone.utc)
+    return incoming_eta.astimezone(SINGAPORE_TIMEZONE).date()
+
+
 def save_new_vessel_observation(vessel, incoming_eta, source="oceans_x"):
     """Create a vessel state without changing an existing vessel's ETA fields.
 
@@ -159,10 +175,12 @@ def save_new_vessel_observation(vessel, incoming_eta, source="oceans_x"):
                     flag,
                     location_from,
                     location_to,
+                    operational_date,
+                    lifecycle_status,
                     eta_source,
                     last_eta_received_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s, NOW())
                 ON CONFLICT (vessel_name, imo_number)
                 DO NOTHING
                 """,
@@ -175,9 +193,159 @@ def save_new_vessel_observation(vessel, incoming_eta, source="oceans_x"):
                     vessel["flag"],
                     vessel["location_from"],
                     vessel["location_to"],
+                    _operational_date(incoming_eta),
                     source,
                 )
             )
+            return cursor.rowcount == 1
+
+
+def stage_vessel_observations(vessels, operational_date, source="oceans_x"):
+    """Store a future day's feed without activating or allocating vessels.
+
+    Existing active rows are never overwritten. Repeated 9 p.m. staging runs
+    only refresh rows that are already staged, making the operation idempotent.
+    """
+
+    staged_count = 0
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for vessel in vessels:
+                incoming_eta = vessel["eta"]
+                if isinstance(incoming_eta, str):
+                    incoming_eta = datetime.fromisoformat(
+                        incoming_eta.replace("Z", "+00:00")
+                    )
+                if incoming_eta.tzinfo is None:
+                    incoming_eta = incoming_eta.replace(tzinfo=timezone.utc)
+
+                cursor.execute(
+                    """
+                    INSERT INTO vessel_state (
+                        vessel_name, imo_number, original_eta, current_eta,
+                        call_sign, flag, location_from, location_to,
+                        operational_date, lifecycle_status, eta_source,
+                        last_eta_received_at
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, 'staged', %s, NOW()
+                    )
+                    ON CONFLICT (vessel_name, imo_number)
+                    DO UPDATE SET
+                        original_eta = EXCLUDED.original_eta,
+                        previous_eta = NULL,
+                        current_eta = EXCLUDED.current_eta,
+                        call_sign = EXCLUDED.call_sign,
+                        flag = EXCLUDED.flag,
+                        location_from = EXCLUDED.location_from,
+                        location_to = EXCLUDED.location_to,
+                        operational_date = EXCLUDED.operational_date,
+                        eta_source = EXCLUDED.eta_source,
+                        last_eta_received_at = NOW(),
+                        last_updated = NOW()
+                    WHERE vessel_state.lifecycle_status = 'staged'
+                    """,
+                    (
+                        vessel["vessel_name"],
+                        vessel["imo_number"],
+                        incoming_eta,
+                        incoming_eta,
+                        vessel.get("call_sign"),
+                        vessel.get("flag"),
+                        vessel.get("location_from"),
+                        vessel.get("location_to"),
+                        operational_date,
+                        source,
+                    ),
+                )
+                staged_count += cursor.rowcount
+
+    return staged_count
+
+
+def activate_staged_vessels(operational_date):
+    """Make one operating day's staged vessels visible to normal workflows."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE vessel_state
+                SET lifecycle_status = 'active', last_updated = NOW()
+                WHERE operational_date = %s AND lifecycle_status = 'staged'
+                """,
+                (operational_date,),
+            )
+            return cursor.rowcount
+
+
+def delete_vessels_before_operational_date(operational_date):
+    """Delete vessel state and dependent records from earlier operating days."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for table in (
+                "schedule_changes",
+                "eta_history",
+                "pilot_assignments",
+                "tug_assignments",
+                "berth_allocations",
+            ):
+                cursor.execute(
+                    f"""
+                    DELETE FROM {table}
+                    WHERE (vessel_name, imo_number) IN (
+                        SELECT vessel_name, imo_number
+                        FROM vessel_state
+                        WHERE operational_date < %s
+                    )
+                    """,
+                    (operational_date,),
+                )
+
+            # Some existing deployments still contain this legacy mirror.
+            cursor.execute("SELECT to_regclass('public.operations_vessels')")
+            if cursor.fetchone()[0] is not None:
+                cursor.execute(
+                    """
+                    DELETE FROM operations_vessels
+                    WHERE (vessel_name, imo_number) IN (
+                        SELECT vessel_name, imo_number
+                        FROM vessel_state
+                        WHERE operational_date < %s
+                    )
+                    """,
+                    (operational_date,),
+                )
+
+            cursor.execute(
+                "DELETE FROM vessel_state WHERE operational_date < %s",
+                (operational_date,),
+            )
+            deleted_vessels = cursor.rowcount
+            return deleted_vessels
+
+
+@contextmanager
+def automation_job_lock(job_name):
+    """Prevent duplicate scheduler workers from running the same job."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_try_advisory_lock(hashtext(%s))",
+                (f"portpilot:{job_name}",),
+            )
+            acquired = cursor.fetchone()[0]
+            try:
+                yield acquired
+            finally:
+                if acquired:
+                    cursor.execute(
+                        "SELECT pg_advisory_unlock(hashtext(%s))",
+                        (f"portpilot:{job_name}",),
+                    )
 
 
 def record_eta_change(vessel, incoming_eta, source="oceans_x"):
@@ -204,6 +372,7 @@ def record_eta_change(vessel, incoming_eta, source="oceans_x"):
                     last_updated = NOW()
                 WHERE vessel_name = %s
                   AND imo_number = %s
+                  AND lifecycle_status = 'active'
                   AND current_eta IS DISTINCT FROM %s
                 RETURNING previous_eta, current_eta
                 """,
@@ -258,7 +427,9 @@ def refresh_vessel_observation(vessel, source="oceans_x"):
                     eta_source = %s,
                     last_eta_received_at = NOW(),
                     last_updated = NOW()
-                WHERE vessel_name = %s AND imo_number = %s
+                WHERE vessel_name = %s
+                  AND imo_number = %s
+                  AND lifecycle_status = 'active'
                 """,
                 (*_metadata_values(vessel)[:4], source, vessel["vessel_name"], vessel["imo_number"]),
             )
@@ -269,6 +440,79 @@ RESOURCE_TABLES = {
     "pilot": ("pilot_assignments", "pilot_id", "assignment_id"),
     "tug": ("tug_assignments", "tug_id", "assignment_id"),
 }
+
+
+def deactivate_resource_pool():
+    """Deactivate yesterday's pool before the daily initializer rebuilds it."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE resources
+                SET status = 'inactive', last_updated = NOW()
+                WHERE status <> 'inactive'
+                """
+            )
+            return cursor.rowcount
+
+
+def has_operational_assignments(operational_date):
+    """Return whether this operating day has already been initialized."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM vessel_state AS vessel
+                    JOIN berth_allocations AS berth
+                      USING (vessel_name, imo_number)
+                    JOIN pilot_assignments AS pilot
+                      USING (vessel_name, imo_number)
+                    JOIN tug_assignments AS tug
+                      USING (vessel_name, imo_number)
+                    WHERE vessel.operational_date = %s
+                      AND vessel.lifecycle_status = 'active'
+                )
+                """,
+                (operational_date,),
+            )
+            return cursor.fetchone()[0]
+
+
+def get_unconfirmed_vessel_keys():
+    """Return active vessels with at least one unconfirmed allocation."""
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT vessel_name, imo_number
+                FROM (
+                    SELECT vessel_name, imo_number FROM berth_allocations
+                    WHERE status = 'unconfirmed'
+                    UNION ALL
+                    SELECT vessel_name, imo_number FROM pilot_assignments
+                    WHERE status = 'unconfirmed'
+                    UNION ALL
+                    SELECT vessel_name, imo_number FROM tug_assignments
+                    WHERE status = 'unconfirmed'
+                ) AS unconfirmed
+                WHERE EXISTS (
+                    SELECT 1 FROM vessel_state
+                    WHERE vessel_state.vessel_name = unconfirmed.vessel_name
+                      AND vessel_state.imo_number = unconfirmed.imo_number
+                      AND lifecycle_status = 'active'
+                )
+                ORDER BY vessel_name, imo_number
+                """
+            )
+            return [
+                {"vessel_name": row[0], "imo_number": row[1]}
+                for row in cursor.fetchall()
+            ]
 
 
 def get_active_resources():
@@ -415,6 +659,7 @@ def get_vessel_schedules_by_keys(vessel_keys):
                     last_eta_received_at, last_updated
                 FROM vessel_state
                 WHERE (vessel_name, imo_number) IN ({placeholders})
+                  AND lifecycle_status = 'active'
                 """,
                 params,
             )
