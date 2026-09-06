@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS vessel_state (
     eta_confidence NUMERIC(4,3),
     last_eta_received_at TIMESTAMPTZ,
     status TEXT NOT NULL DEFAULT 'active',
+    operational_date DATE NOT NULL,
+    lifecycle_status TEXT NOT NULL DEFAULT 'active'
+        CHECK (lifecycle_status IN ('staged', 'active')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (vessel_name, imo_number)
@@ -117,7 +120,10 @@ CREATE TABLE IF NOT EXISTS schedule_changes (
 );
 
 CREATE INDEX IF NOT EXISTS eta_history_vessel_received_idx
-    ON eta_history (vessel_name, imo_number, received_at DESC);
+ON eta_history (vessel_name, imo_number, received_at DESC);
+
+CREATE INDEX IF NOT EXISTS vessel_state_operational_lifecycle_idx
+ON vessel_state (operational_date, lifecycle_status);
 
 ALTER TABLE pilot_assignments
 ADD CONSTRAINT pilot_assignments_vessel_unique
