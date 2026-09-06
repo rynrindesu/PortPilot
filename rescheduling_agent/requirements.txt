@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+psycopg[binary,pool]
+pytest
+langchain-core
+langgraph
+langchain-groq
+langchain-aws
+boto3
