@@ -156,23 +156,58 @@ staging, initialization, hourly monitoring, and recovery cannot overlap.
 Run one FastAPI worker for this prototype. The latest completed scheduler
 results are held in process memory and are available at `GET /automation/status`.
 
-## OCR and Port-Call Agent (planned)
+## OCR Serivce and Port-Ops Agent (planned)
 
-`ocr_agent/` will be a sibling service with its own `.venv` and `.env`. It is
-not included in this branch yet, so there is no installation or run command
-for it today.
+The OCR service processes uploaded vessel documents and converts their
+contents into structured data for downstream validation and compliance
+checks. It identifies document types, extracts relevant vessel and port-call
+information, and prepares the results for use by the Port-Ops Agent.
 
-When it is added, the service will handle:
+The Port-Ops Agent manages vessel port-call compliance and operational
+workflows for the Port of Singapore. It evaluates submitted documents,
+performs compliance and risk checks, determines whether correction, human
+review, or physical inspection is required, and manages the vessel's
+progression through arrival, operations, and departure.
 
-- PDF text extraction and maritime-document classification;
-- structured field extraction and validation;
-- port-call compliance, risk, and escalation checks; and
-- human inspection workflow support.
+### Prerequisites
 
-Its expected prerequisites are Python 3.13 or later, PDF-processing
-dependencies, and an OpenAI API key for document classification and extraction.
-Its configuration will live in `ocr_agent/.env`, separately from the
-rescheduling credentials.
+- Python 3.13 or later
+- One LLM provider:
+  - OpenAI API; or
+  - Groq API credentials; or
+  - AWS credentials and Amazon Bedrock access
+
+### Configure the service
+
+Create `port_ops_agent/.env` and provide the credentials supplied by the
+project owner. Keep this file private; it is excluded from version control.
+
+```dotenv
+# OpenAI
+OPENAI_API_KEY=
+```
+
+### Install and run
+
+Run these commands from the repository root:
+
+```bash
+cd port_ops_agent
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pip install -e .
+uvicorn PortPilot.main:app --app-dir src --reload
+```
+
+### Test the service
+
+From `port_ops_agent/`, with its virtual environment activated:
+
+```bash
+python -m pytest -v
+```
+
 
 ## Repository structure
 
@@ -193,7 +228,7 @@ PortPilot/
 │   │   └── monitoring/
 │   └── tests/
 │
-└── ocr_agent/                # Planned service; not yet added
+└── port_ops_agent/                # Planned service; not yet added
     ├── .env
     ├── .venv/
     ├── src/
