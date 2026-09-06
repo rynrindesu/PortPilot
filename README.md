@@ -12,7 +12,7 @@ importing Python code from one another.
 | Service | Status | Responsibility |
 | --- | --- | --- |
 | `rescheduling_agent/` | Available | Monitors vessel arrivals, detects ETA changes, and manages berth, pilot, and tug rescheduling. |
-| `ocr_agent/` | Planned | Extracts maritime documents and supports port-call compliance and inspection workflows. |
+| `port_ops_agent/` | Available | Extracts maritime documents and supports port-call compliance and inspection workflows. |
 
 ## Rescheduling Agent
 
@@ -156,7 +156,7 @@ staging, initialization, hourly monitoring, and recovery cannot overlap.
 Run one FastAPI worker for this prototype. The latest completed scheduler
 results are held in process memory and are available at `GET /automation/status`.
 
-## OCR Serivce and Port-Ops Agent (planned)
+## OCR Serivce and Port-Ops Agent 
 
 The OCR service processes uploaded vessel documents and converts their
 contents into structured data for downstream validation and compliance
