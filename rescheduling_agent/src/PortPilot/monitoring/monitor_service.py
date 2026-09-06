@@ -247,6 +247,14 @@ def monitor_vessels(
     return changes
 
 
+def _reason_for_resource_type(resource_type, vessel_name, invalid_options):
+    for option in invalid_options:
+        reason = option.get("invalid_reason") or ""
+        if resource_type in reason:
+            return reason
+    return f"No valid option could be found for {vessel_name}'s {resource_type} allocation."
+
+
 # Retry a vessel's unconfirmed assignments using the scheduling pipeline.
 # Apply the best valid option (outcome: "resources_allocated"), or escalate
 # to pending_review if none exists (outcome: "pending_review").
@@ -292,9 +300,11 @@ def retry_unconfirmed_operations(vessel_name, imo_number):
             "applied": applied, "escalated": [],
         }
 
-    escalation_reason = invalid[0]["invalid_reason"] if invalid else "No valid scheduling option was found."
     escalated = [
-        flag_allocation_for_review(resource_type, vessel_name, imo_number, escalation_reason)
+        flag_allocation_for_review(
+            resource_type, vessel_name, imo_number,
+            _reason_for_resource_type(resource_type, vessel_name, invalid),
+        )
         for resource_type in unconfirmed_types
     ]
     return {
