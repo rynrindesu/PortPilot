@@ -37,11 +37,12 @@ load_dotenv()
 PROVIDER = os.environ.get("LLM_PROVIDER", "groq")
 
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+
 BEDROCK_MODEL = os.environ.get(
-    "BEDROCK_MODEL", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    "BEDROCK_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 )
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get(
-    "AWS_REGION", "ap-southeast-1"
+    "AWS_REGION", "us-east-1"
 )
 
 

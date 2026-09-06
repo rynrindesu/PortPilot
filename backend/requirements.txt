@@ -7,7 +7,5 @@ pytest
 langchain-core
 langgraph
 langchain-groq
-
-# Only needed if LLM_PROVIDER=bedrock (see agent.py's create_model()).
-# langchain-aws
-# boto3
+langchain-aws
+boto3

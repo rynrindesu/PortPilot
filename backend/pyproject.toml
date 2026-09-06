@@ -15,12 +15,9 @@ dependencies = [
     "langchain-core",
     "langgraph",
     "langchain-groq",
+    "langchain-aws",
+    "boto3",
 ]
-
-[project.optional-dependencies]
-# Only needed once LLM_PROVIDER=bedrock (see agent.py's create_model()) -
-# install with: pip install -e ".[bedrock]"
-bedrock = ["langchain-aws", "boto3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
