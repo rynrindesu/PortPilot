@@ -141,9 +141,32 @@ def assign_initial_operations(vessel_name, imo_number, eta, is_new_vessel, exist
     return assigned
 
 
-def monitor_vessels(date):
+def monitor_vessels(
+    date,
+    not_before=None,
+    current_vessels=None,
+    assign_operations=True,
+):
     print("Fetching OCEANS-X data...")
-    current_vessels = get_vessels_due_to_arrive(date)
+    if current_vessels is None:
+        current_vessels = get_vessels_due_to_arrive(date)
+    else:
+        current_vessels = list(current_vessels)
+
+    if not_before is not None:
+        cutoff = normalize_eta(not_before)
+        original_count = len(current_vessels)
+        current_vessels = [
+            vessel
+            for vessel in current_vessels
+            if normalize_eta(vessel["eta"]) >= cutoff
+        ]
+        skipped_count = original_count - len(current_vessels)
+        if skipped_count:
+            print(f"Skipped {skipped_count} vessel(s) whose ETA has already passed.")
+
+    current_vessels.sort(key=lambda vessel: normalize_eta(vessel["eta"]))
+
     print(f"Received {len(current_vessels)} vessels.")
 
     # Batch-fetch which vessels already have an allocation of each type
@@ -165,7 +188,13 @@ def monitor_vessels(date):
 
         # new vessel pulled in by api has no operations seeded
         if is_new_vessel:
-            save_new_vessel_observation(vessel, incoming_eta)
+            inserted_as_active = save_new_vessel_observation(vessel, incoming_eta)
+            # A staged row for a future operating day deliberately remains
+            # invisible to active monitoring. Its primary-key conflict makes
+            # this insert return False; do not assign resources before the
+            # midnight activation job.
+            if inserted_as_active is False:
+                continue
         else:
             stored_current_eta = normalize_eta(previous_state["current_eta"])
 
@@ -184,18 +213,20 @@ def monitor_vessels(date):
             else:
                 refresh_vessel_observation(vessel)
 
-        # Ensure every vessel has a complete operational schedule.
-        # Incomplete schedules are retried on subsequent polls.
+        # Ensure every vessel has a complete operational schedule during normal
+        # monitoring. Midnight initialization disables this so the original
+        # generate_operations() routine can size and assign the whole day.
         assigned = {}
         assignment_error = None
-        try:
-            assigned = assign_initial_operations(
-                vessel_name, imo_number, incoming_eta, is_new_vessel, existing_allocation_keys
-            )
-        except Exception as error:
-            # Don't let one failed assignment stop the monitoring poll.
-            assignment_error = str(error)
-            print(f"  Could not assign initial operations for {vessel_name} ({imo_number}): {error}")
+        if assign_operations:
+            try:
+                assigned = assign_initial_operations(
+                    vessel_name, imo_number, incoming_eta, is_new_vessel, existing_allocation_keys
+                )
+            except Exception as error:
+                # Don't let one failed assignment stop the monitoring poll.
+                assignment_error = str(error)
+                print(f"  Could not assign initial operations for {vessel_name} ({imo_number}): {error}")
 
         # Only a new vessel is reported as a change here; retried assignments
         # for an existing vessel's incomplete schedule happen silently.

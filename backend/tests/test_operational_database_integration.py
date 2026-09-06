@@ -28,17 +28,18 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
     berth_start = baseline_eta + timedelta(minutes=30)
     berth_end = baseline_eta + timedelta(hours=8)
 
-    connection = get_connection()
-    try:
-        with connection.cursor() as cursor:
+    with get_connection() as connection:
+        try:
+            with connection.cursor() as cursor:
                 # First observation creates both the live record and its one-time
                 # baseline operational plan.
                 cursor.execute(
                     """
                     INSERT INTO vessel_state
                         (vessel_name, imo_number, original_eta, current_eta,
-                         call_sign, flag, location_from, location_to)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                         call_sign, flag, location_from, location_to,
+                         operational_date, lifecycle_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
                     """,
                     (
                         vessel_name,
@@ -49,6 +50,7 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
                         "SG",
                         "TEST",
                         "SGSIN",
+                        baseline_eta.date(),
                     ),
                 )
                 cursor.execute(
@@ -167,7 +169,6 @@ def test_live_eta_change_does_not_overwrite_frozen_operational_schedule():
                     (vessel_name, imo_number),
                 )
                 assert cursor.fetchone() == (pilot_start, pilot_end, new_start, new_end, "agent")
-    finally:
-        # Always roll back before closing, including when an assertion fails.
-        connection.rollback()
-        connection.close()
+        finally:
+            # Return the pooled connection without retaining integration-test data.
+            connection.rollback()

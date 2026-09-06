@@ -26,6 +26,7 @@ from PortPilot.monitoring.monitor_service import (
     monitor_vessels,
     retry_unconfirmed_operations,
 )
+from PortPilot.database.postgres import get_unconfirmed_vessel_keys
 
 logger = logging.getLogger(__name__)
 
@@ -320,7 +321,7 @@ def _deduplicate_events(events: list) -> list:
     return [by_key[key] for key in order]
 
 
-def run_monitoring_cycle(date) -> dict:
+def run_monitoring_cycle(date, not_before=None, current_vessels=None) -> dict:
     """Poll OCEANS-X and process all resulting scheduling events.
 
     ETA changes are processed first through the agent graph. Once they are
@@ -330,7 +331,13 @@ def run_monitoring_cycle(date) -> dict:
     Each vessel is processed independently so one failure does not stop
     the rest of the monitoring cycle.
     """
-    changes = _deduplicate_events(monitor_vessels(date))
+    changes = _deduplicate_events(
+        monitor_vessels(
+            date,
+            not_before=not_before,
+            current_vessels=current_vessels,
+        )
+    )
 
     eta_change_events = [event for event in changes if event["event"] == "ETA_CHANGED"]
     unconfirmed_events = [
@@ -338,6 +345,15 @@ def run_monitoring_cycle(date) -> dict:
         if event["event"] == "NEW_VESSEL_DISCOVERED"
         and any(info["status"] == "unconfirmed" for info in event["assigned"].values())
     ]
+    queued_unconfirmed = {
+        (event["vessel_name"], event["imo_number"])
+        for event in unconfirmed_events
+    }
+    for vessel in get_unconfirmed_vessel_keys():
+        key = (vessel["vessel_name"], vessel["imo_number"])
+        if key not in queued_unconfirmed:
+            unconfirmed_events.append(vessel)
+            queued_unconfirmed.add(key)
 
     errors = []
 
