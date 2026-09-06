@@ -9,3 +9,7 @@ Requires-Dist: uvicorn
 Requires-Dist: psycopg[binary,pool]
 Requires-Dist: langchain-core
 Requires-Dist: langgraph
+Requires-Dist: langchain-groq
+Provides-Extra: bedrock
+Requires-Dist: langchain-aws; extra == "bedrock"
+Requires-Dist: boto3; extra == "bedrock"

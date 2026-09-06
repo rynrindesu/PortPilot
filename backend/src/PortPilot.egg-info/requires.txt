@@ -5,3 +5,8 @@ uvicorn
 psycopg[binary,pool]
 langchain-core
 langgraph
+langchain-groq
+
+[bedrock]
+langchain-aws
+boto3
