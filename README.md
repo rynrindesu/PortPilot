@@ -149,18 +149,6 @@ progression through arrival, operations, and departure.
   - Groq API credentials; or
   - AWS credentials and Amazon Bedrock access
 
-### Configure the service
-
-Add the Port-Ops credentials to the same root `.env` file used by the
-rescheduling service. Keep this file private; it is excluded from version
-control. Run the service from `port_ops_agent/`; its configuration loader
-discovers the root `.env` file.
-
-```dotenv
-# OpenAI
-OPENAI_API_KEY=
-```
-
 ### Install and run
 
 Run these commands from the repository root:
