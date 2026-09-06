@@ -2,13 +2,25 @@
 
 PortPilot is an agentic AI prototype for maritime port-call operations in Singapore.
 
-The system continuously monitors vessel arrival information and identifies operational changes that may require action. An AI agent can then investigate the impact, formulate a plan, and execute appropriate actions through available tools.
+## Services
 
-## Current Prototype
+PortPilot is being organised as two independent services. They have separate
+Python environments, configuration files, dependencies, and deployment
+boundaries. They will communicate through explicit APIs or events—not by
+importing Python code from one another.
 
-PortPilot connects to the OCEANS-X API and automatically manages vessel arrivals and their berth, pilot, and tug assignments for the Port of Singapore.
+| Service | Status | Responsibility |
+| --- | --- | --- |
+| `rescheduling_agent/` | Available | Monitors vessel arrivals, detects ETA changes, and manages berth, pilot, and tug rescheduling. |
+| `ocr_agent/` | Planned | Extracts maritime documents and supports port-call compliance and inspection workflows. |
 
-The current operating flow is:
+## Rescheduling Agent
+
+The rescheduling service connects to the OCEANS-X API and automatically
+manages vessel arrivals and their berth, pilot, and tug assignments for the
+Port of Singapore.
+
+### How it works
 
 ```text
 OCEANS-X API
@@ -35,165 +47,155 @@ Initial or existing assignment handling
         Apply the option or mark it for review
 ```
 
-## Automated operating-day lifecycle
+### Prerequisites
 
-When the FastAPI application is running and automation is enabled, PortPilot schedules its recurring jobs using Singapore time (`Asia/Singapore`).
+- Python 3.13 or later
+- Supabase/PostgreSQL connection details
+- OCEANS-X API credentials
+- One LLM provider:
+  - Groq API credentials; or
+  - AWS credentials and Amazon Bedrock access
 
-Automation is enabled by default. Set `PORTPILOT_AUTOMATION_ENABLED=false` to disable it during maintenance or local API work.
+### Configure the service
 
-### 21:00 — Stage the next operating day
+Create `rescheduling_agent/.env` and provide the credentials supplied by the
+project owner. Keep this file private; it is excluded from version control.
 
-At 21:00 each day, PortPilot:
+```dotenv
+# OCEANS-X
+OCEANX_VESSELS_DUE_TO_ARRIVE_API_KEY=
 
-1. Fetches the complete OCEANS-X arrival feed for tomorrow.
-2. Stores new vessels with the `staged` lifecycle status.
-3. Refreshes vessels that are already staged if the job runs again.
+# Supabase/PostgreSQL
+SUPABASE_DB_URL=
+SUPABASE_DB_PASSWORD=
 
-Staged vessels are not visible to normal monitoring and do not receive berth, pilot, or tug assignments. Existing active vessel records are not overwritten by staging.
+# Automation: true by default
+PORTPILOT_AUTOMATION_ENABLED=true
 
-### 00:00 — Initialize the new operating day
+# LLM provider: groq or bedrock
+LLM_PROVIDER=groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
 
-At midnight, PortPilot:
-
-1. Deletes vessel records from earlier operating days, including their dependent history and assignment records.
-2. Activates vessels that were staged for today.
-3. Fetches today’s complete OCEANS-X arrival feed again.
-4. Deactivates the previous resource pool.
-5. Persists the complete vessel feed without assigning resources from the previous pool.
-6. Runs `generate_operations()`.
-
-The initializer creates operation windows, calculates peak concurrent demand, activates the required berth, pilot, and tug resource pools, and creates missing initial assignments.
-
-Vessel and ETA differences detected while the midnight feed is persisted are reported in the job result, but they are not sent through the AI rescheduling agent during initialization.
-
-The scheduler normally invokes this initializer at midnight. It may also invoke it during startup recovery if the midnight initialization appears to have been missed. Existing operation records are skipped rather than recreated by `generate_operations()`.
-
-### HH:05 — Monitor the current operating day
-
-At five minutes past every hour, PortPilot:
-
-1. Fetches today’s OCEANS-X arrival feed.
-2. Excludes feed entries whose ETA has already passed.
-3. Compares the remaining arrivals with the active vessel state.
-4. Records new vessels and ETA changes.
-5. Processes each vessel independently so one failure does not stop the rest of the cycle.
-
-ETA changes are handled by the AI rescheduling agent. The agent examines the current schedule, requests deterministic validated and ranked options, and selects an option by its ID. PortPilot retrieves the complete option, applies it, and verifies the resulting database state. The agent may retain the current schedule, apply a reschedule, or escalate unresolved allocations for review.
-
-New vessels receive missing berth, pilot, and tug assignments from the existing active resource pools. If a conflict-free resource is unavailable, the assignment is initially marked `unconfirmed`.
-
-Unconfirmed assignments do not use the AI agent. They are retried through the deterministic scheduling pipeline, which applies the highest-ranked valid option. If no valid option is available, the affected assignments are marked `pending_review`.
-
-The unconfirmed-assignment recovery scan covers every active vessel with an `unconfirmed` assignment. It does not apply the hourly ETA cutoff, so an active vessel whose ETA has passed may still receive this recovery attempt.
-
-Hourly jobs never call `generate_operations()` and never resize the active resource pools.
-
-## Startup recovery
-
-The scheduler performs one startup catch-up operation whenever the FastAPI application starts.
-
-### Startup before 21:00
-
-PortPilot checks whether today appears to have been initialized.
-
-- If today is initialized, it deletes earlier operating-day records, activates any staged records for today, and immediately runs monitoring for today’s upcoming arrivals.
-- If today is not initialized, it runs the midnight initialization as a catch-up.
-
-### Startup at or after 21:00
-
-PortPilot first stages tomorrow’s arrivals.
-
-- If today is initialized, the startup catch-up ends after staging tomorrow. It does not run an immediate monitoring pass for today.
-- If today is not initialized, it stages tomorrow and then runs the missed-midnight initialization for today.
-
-Skipping an immediate startup monitoring pass after 21:00 does not stop regular monitoring. The hourly scheduler remains active and continues monitoring today at 21:05, 22:05, and 23:05, as applicable. At 00:00, it initializes the new operating day.
-
-For startup recovery, PortPilot treats today as initialized when at least one active vessel has berth, pilot, and tug assignment records. This check does not guarantee that every vessel has a complete schedule; incomplete and unconfirmed assignments are handled by subsequent monitoring cycles.
-
-## Concurrency and job status
-
-Run one FastAPI worker for the prototype.
-
-All lifecycle jobs share a PostgreSQL advisory lock. The lock prevents the staging, initialization, hourly monitoring, and startup jobs from making overlapping database changes. It also protects against duplicate execution if another worker is accidentally started.
-
-If a job cannot acquire the lock because another lifecycle job is running, that execution is skipped rather than queued.
-
-The latest completed scheduler results are available from:
-
-```http
-GET /automation/status
+# Required when LLM_PROVIDER=bedrock
+BEDROCK_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
+AWS_DEFAULT_REGION=us-east-1
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_SESSION_TOKEN=
 ```
 
-The endpoint reports:
+### Install and run
 
-- whether the in-process scheduler is running;
-- the configured Singapore-time schedule; and
-- the latest completed result for each job type.
+Run these commands from the repository root:
 
-These results exist only in the memory of the current FastAPI process. They are cleared when the application restarts, do not provide historical job records, and do not report live progress for a job that is still running.
-
-## Prerequisites
-
-Before setting up PortPilot, install:
-
-- Python 3.13+
-- Access to the team's OCEANS-X API credentials
-- Access to the team's Supabase database credentials
-
-Copy `.env.example` to `.env` and fill in the credentials provided securely by the project owner.
-
-## Create Python environment and install required dependencies
-
+```bash
+cd rescheduling_agent
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
+uvicorn PortPilot.main:app --app-dir src --reload
+```
 
-cd backend
-pip install -r requirements.txt
-pip install -e .
+The local API is then available at:
 
-## Project Structure
+- Interactive API documentation: `http://127.0.0.1:8000/docs`
+- Manually run monitoring: `POST /monitor?arrival_date=YYYY-MM-DD`
+- View scheduler status: `GET /automation/status`
+
+To run without automatic reload, omit `--reload`.
+
+### Test the service
+
+From `rescheduling_agent/`, with its virtual environment activated:
+
+```bash
+PYTHONPATH=src python -m pytest
+```
+
+Some integration and scheduling-pipeline tests require a reachable,
+configured PostgreSQL database. The service can still be import-checked with:
+
+```bash
+PYTHONPATH=src python -c "from PortPilot.main import app; print(app.title)"
+```
+
+### Automated operating-day lifecycle
+
+When the FastAPI application is running, the rescheduling service schedules
+recurring jobs using Singapore time (`Asia/Singapore`). Automation is enabled
+by default. Set `PORTPILOT_AUTOMATION_ENABLED=false` in
+`rescheduling_agent/.env` for local API work or maintenance.
+
+#### 21:00 — Stage the next operating day
+
+At 21:00 each day, the service fetches tomorrow's OCEANS-X arrival feed and
+stores new vessels as `staged`. Staged vessels are not visible to normal
+monitoring and do not receive berth, pilot, or tug assignments.
+
+#### 00:00 — Initialize the new operating day
+
+At midnight, the service removes earlier operating-day records, activates
+today's staged vessels, refreshes the complete arrival feed, activates the
+required resource pools, and creates missing initial assignments.
+
+#### HH:05 — Monitor the current operating day
+
+At five minutes past every hour, the service fetches today's feed, records new
+vessels and ETA changes, and processes each vessel independently. ETA changes
+go through the rescheduling agent. New incomplete assignments use the
+deterministic scheduling pipeline and are marked for review if no valid option
+exists.
+
+### Startup recovery and concurrency
+
+On startup, the rescheduling service performs a catch-up operation for the
+current operating day. All lifecycle jobs share a PostgreSQL advisory lock, so
+staging, initialization, hourly monitoring, and recovery cannot overlap.
+
+Run one FastAPI worker for this prototype. The latest completed scheduler
+results are held in process memory and are available at `GET /automation/status`.
+
+## OCR and Port-Call Agent (planned)
+
+`ocr_agent/` will be a sibling service with its own `.venv` and `.env`. It is
+not included in this branch yet, so there is no installation or run command
+for it today.
+
+When it is added, the service will handle:
+
+- PDF text extraction and maritime-document classification;
+- structured field extraction and validation;
+- port-call compliance, risk, and escalation checks; and
+- human inspection workflow support.
+
+Its expected prerequisites are Python 3.13 or later, PDF-processing
+dependencies, and an OpenAI API key for document classification and extraction.
+Its configuration will live in `ocr_agent/.env`, separately from the
+rescheduling credentials.
+
+## Repository structure
 
 ```text
 PortPilot/
 ├── README.md
-├── .env.example
 ├── .gitignore
+├── rescheduling_agent/       # Current runnable service
+│   ├── .env                  # Local only; not committed
+│   ├── .venv/                # Local only; not committed
+│   ├── pyproject.toml
+│   ├── requirements.txt
+│   ├── src/PortPilot/
+│   │   ├── agent/            # ETA-change scheduling agent
+│   │   ├── api/
+│   │   ├── database/
+│   │   ├── integration/
+│   │   └── monitoring/
+│   └── tests/
 │
-└── backend/
-    ├── pyproject.toml
-    ├── requirements.txt
-    │
+└── ocr_agent/                # Planned service; not yet added
+    ├── .env
+    ├── .venv/
     ├── src/
-    │   └── portpilot/
-    │       ├── __init__.py
-    │       ├── main.py
-    │       │
-    │       ├── api/
-    │       │   ├── __init__.py
-    │       │   └── routes/
-    │       │       ├── __init__.py
-    │       │       └── monitoring.py
-    │       │
-    │       ├── integration/
-    │       │   ├── __init__.py
-    │       │   └── oceans.py
-    │       │
-    │       ├── database/
-    │       │   ├── __init__.py
-    │       │   └── postgres.py
-    │       │
-    │       ├── monitoring/
-    │       │   ├── __init__.py
-    │       │   ├── monitor_service.py
-    │       │   ├── seed.py
-    │       │   └── state.py
-    │       │
-    │       └── agent/
-    │           ├── __init__.py
-    │           ├── agent.py
-    │           ├── graph.py
-    │           └── tools.py
-    │
     └── tests/
-        ├── ...
 ```

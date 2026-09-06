@@ -1,12 +1,11 @@
-requests
-python-dotenv
 fastapi
 uvicorn
+requests
+python-dotenv
 psycopg[binary,pool]
+pytest
 langchain-core
 langgraph
 langchain-groq
-
-[bedrock]
 langchain-aws
 boto3
