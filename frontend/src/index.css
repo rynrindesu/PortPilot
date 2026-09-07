@@ -1,0 +1,324 @@
+@import "tailwindcss";
+
+/* ============================================================
+   PortPilot — "Harbour Control"
+   Aesthetic: abyssal nautical chart. Deep water ground, bathymetric
+   contour lines, sodium-vapour harbour lighting, port/starboard
+   semantics borrowed from actual navigation lights.
+   ============================================================ */
+
+@theme {
+  /* --- water column: darkest at depth --- */
+  --color-abyss: #05080f;
+  --color-deep: #080d17;
+  --color-hull: #0c1320;
+  --color-plate: #111a2b;
+  --color-rail: #1a2639;
+  --color-mist: #2a3a52;
+
+  /* --- ink --- */
+  --color-chalk: #e8edf5;
+  --color-fog: #94a5bd;
+  --color-slate-ink: #5c6f8a;
+
+  /* --- navigation lights (semantic, not decorative) --- */
+  --color-signal: #ffb020; /* sodium harbour light — primary accent */
+  --color-signal-dim: #a16f10;
+  --color-starboard: #12e39a; /* green = clear / confirmed */
+  --color-port: #ff4d5e; /* red = blocked / rejected */
+  --color-beacon: #35d6ff; /* cyan = autonomous agent action */
+  --color-caution: #c9a227; /* amber-olive = pending review */
+
+  --font-display: "Archivo", "Arial Narrow", sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  --radius-panel: 4px;
+}
+
+:root {
+  --grid-line: rgba(93, 128, 173, 0.07);
+  --contour: rgba(53, 214, 255, 0.045);
+  --sweep-duration: 7s;
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-rail);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-abyss);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* ---------- the chart beneath everything ---------- */
+.chart-ground {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      ellipse 90% 60% at 78% -10%,
+      rgba(255, 176, 32, 0.09),
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 8% 105%,
+      rgba(53, 214, 255, 0.07),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--color-deep) 0%, var(--color-abyss) 100%);
+}
+
+.chart-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 0%, black 20%, transparent 85%);
+}
+
+/* film grain — keeps the flat darks from banding */
+.grain {
+  position: fixed;
+  inset: -50%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-drift 6s steps(6) infinite;
+}
+
+@keyframes grain-drift {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3%, 2%); }
+  40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -2%); }
+  80% { transform: translate(3%, 1%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ---------- typography ---------- */
+.display {
+  font-family: var(--font-display);
+  font-stretch: 118%;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+}
+
+.display-tight {
+  font-family: var(--font-display);
+  font-stretch: 92%;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-slate-ink);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.numeral {
+  font-family: var(--font-display);
+  font-stretch: 125%;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+}
+
+/* ---------- panels: riveted instrument plates ---------- */
+.panel {
+  position: relative;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-plate) 92%, transparent),
+      color-mix(in srgb, var(--color-hull) 96%, transparent)
+    );
+  border: 1px solid var(--color-rail);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(6px);
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045),
+    transparent 42%
+  );
+}
+
+/* corner ticks — the thing people remember */
+.ticked::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-mist), var(--color-mist)) 0 0 / 1px 9px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 0 0 / 9px 1px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 100% 0 / 1px 9px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 100% 0 / 9px 1px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 0 100% / 1px 9px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 0 100% / 9px 1px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 100% 100% / 1px 9px no-repeat,
+    linear-gradient(var(--color-mist), var(--color-mist)) 100% 100% / 9px 1px no-repeat;
+  opacity: 0.55;
+}
+
+.hairline {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--color-rail) 0 1px,
+    transparent 1px 6px
+  );
+  height: 1px;
+}
+
+/* ---------- radar sweep (nav header) ---------- */
+.sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--color-starboard) 55%, transparent) 32deg,
+    transparent 55deg
+  );
+  animation: sweep var(--sweep-duration) linear infinite;
+}
+
+@keyframes sweep {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- status pulse ---------- */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0;
+  animation: ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ping {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  70%, 100% { transform: scale(2.1); opacity: 0; }
+}
+
+/* ---------- entry choreography ---------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wipe-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.rise {
+  animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wipe {
+  animation: wipe-in 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* ---------- scan line for "live" surfaces ---------- */
+.scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40%;
+  top: -40%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--color-beacon) 7%, transparent),
+    transparent
+  );
+  animation: scan 5.5s linear infinite;
+}
+@keyframes scan {
+  to { top: 110%; }
+}
+
+/* ---------- scrollbars ---------- */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rail) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-rail);
+  border-radius: 99px;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-mist);
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- focus ---------- */
+:focus-visible {
+  outline: 1px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-signal) 40%, transparent);
+  color: var(--color-chalk);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

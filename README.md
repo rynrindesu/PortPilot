@@ -171,6 +171,34 @@ python -m pytest -v
 ```
 
 
+## Operations console
+
+A React console for both services lives in `frontend/`. It ships with a
+bundled operating-day dataset, so it runs with no database and no credentials.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+See `frontend/README.md` for the screens and for pointing it at live services.
+
+## Deployment
+
+`deploy/aws/` holds CloudFormation for AWS:
+
+- **Console** — S3 + CloudFront, roughly $0.20 for a hackathon.
+- **Backends** — one EC2 instance running both FastAPI services behind nginx,
+  routed through the same CloudFront distribution under `/api/*` so there is no
+  CORS, no mixed content and no certificate to manage.
+
+```powershell
+./deploy/aws/deploy-frontend.ps1
+```
+
+Full walkthrough and costs: `deploy/aws/README.md`.
+
 ## Repository structure
 
 ```text
@@ -178,6 +206,8 @@ PortPilot/
 ├── README.md
 ├── .gitignore
 ├── .env                      # Shared local configuration; not committed
+├── frontend/                 # Operations console (React + Vite)
+├── deploy/aws/               # CloudFormation and deployment scripts
 ├── rescheduling_agent/       # Current runnable service
 │   ├── .venv/                # Local only; not committed
 │   ├── pyproject.toml

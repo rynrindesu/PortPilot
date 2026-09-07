@@ -5,6 +5,7 @@ vessels with an unconfirmed resource.
 
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
@@ -27,6 +28,7 @@ from PortPilot.monitoring.monitor_service import (
     retry_unconfirmed_operations,
 )
 from PortPilot.database.postgres import get_unconfirmed_vessel_keys
+from PortPilot.monitoring.run_log import agent_run_log
 
 logger = logging.getLogger(__name__)
 
@@ -261,8 +263,18 @@ def _process_eta_change(event: dict) -> dict:
     logger.info("Processing ETA_CHANGED for %s (%s)", vessel_name, imo_number)
 
     state = initial_state(event)
+    started = time.perf_counter()
     result_state = _get_compiled_graph().invoke(state)
+    duration_ms = int((time.perf_counter() - started) * 1000)
     final_result = result_state["final_result"]
+
+    # Record the decision trace for the operations console. Postgres keeps the
+    # applied change but not the options that were rejected, and those are the
+    # evidence behind an escalation. Never let this cost a vessel its schedule.
+    try:
+        agent_run_log.record_eta_change(event, result_state, duration_ms)
+    except Exception:
+        logger.exception("Could not record agent run for %s", vessel_name)
 
     logger.info(
         "%s (%s) -> outcome=%s",
@@ -279,7 +291,14 @@ def _retry_unconfirmed_vessel(event: dict) -> dict:
 
     logger.info("Retrying unconfirmed vessel %s (%s)", vessel_name, imo_number)
 
+    started = time.perf_counter()
     result = retry_unconfirmed_operations(vessel_name, imo_number)
+    duration_ms = int((time.perf_counter() - started) * 1000)
+
+    try:
+        agent_run_log.record_retry(event, result, duration_ms)
+    except Exception:
+        logger.exception("Could not record retry for %s", vessel_name)
 
     logger.info(
         "%s (%s) -> outcome=%s",

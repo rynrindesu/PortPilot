@@ -1,0 +1,320 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  PortPilot backend host - one EC2 instance running both FastAPI services
+  behind nginx. The rescheduling service owns long-lived asyncio scheduler
+  loops and a PostgreSQL advisory lock, so it needs a persistent process; that
+  rules out Lambda. nginx strips the /api/scheduling and /api/portops prefixes
+  so CloudFront can front both services on the console's own origin.
+
+  No SSH key and no inbound port 22: shell access is through SSM Session
+  Manager. Secrets are read from SSM Parameter Store at boot, never baked in.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: portpilot-api
+    AllowedPattern: "[a-z0-9-]{3,40}"
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+    Description: >
+      t3.micro is Free Tier eligible for the first 12 months of a new account.
+      Step up to t3.small if the LangGraph agent runs out of memory.
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Your default VPC is fine.
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: A public subnet in that VPC (a default subnet is public).
+
+  RepoUrl:
+    Type: String
+    Default: https://github.com/rynrindesu/PortPilot.git
+    Description: Public HTTPS clone URL. A private repo needs a deploy token.
+
+  RepoBranch:
+    Type: String
+    Default: main
+
+  ParameterPrefix:
+    Type: String
+    Default: /portpilot
+    Description: >
+      SSM Parameter Store prefix holding the service configuration. Every
+      parameter under it becomes an environment variable named after its last
+      path segment. See put-secrets.ps1.
+
+  AllowedIngressPrefixListId:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. The com.amazonaws.global.cloudfront.origin-facing managed
+      prefix list ID for your region. When set, only CloudFront edge servers
+      can reach port 80. Leave empty to allow the whole internet (fine for a
+      short-lived demo, not for anything else).
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Conditions:
+  RestrictToCloudFront: !Not [!Equals [!Ref AllowedIngressPrefixListId, ""]]
+
+Resources:
+  # ---------------------------------------------------------------
+  # Instance identity - SSM shell access plus read-only config access.
+  # ---------------------------------------------------------------
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: read-portpilot-config
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPrefix}/*"
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Sub "arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
+        - PolicyName: portpilot-ai-services
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Only needed when LLM_PROVIDER=bedrock, and for the OCR path.
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - textract:AnalyzeDocument
+                  - textract:DetectDocumentText
+                Resource: "*"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} - HTTP from CloudFront only"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - !If
+          - RestrictToCloudFront
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            SourcePrefixListId: !Ref AllowedIngressPrefixListId
+            Description: CloudFront origin-facing edge servers
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+            Description: Open HTTP (demo only)
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-sg"
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      Comment: Both services are installed and supervised by systemd at boot.
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref SecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Ref ProjectName
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > >(tee /var/log/portpilot-bootstrap.log) 2>&1
+
+          dnf -y update
+          dnf -y install git nginx python3.11 python3.11-pip gcc python3.11-devel
+
+          install -d -m 0755 /opt/portpilot
+          install -d -m 0750 /etc/portpilot
+
+          git clone --branch "${RepoBranch}" --depth 1 "${RepoUrl}" /opt/portpilot/app
+
+          # ---- configuration from SSM Parameter Store -------------------
+          # Every parameter under the prefix becomes ONE env var, named after
+          # its last path segment. Nothing secret is ever written to the AMI.
+          cat >/usr/local/bin/portpilot-load-config <<'LOADER'
+          #!/bin/bash
+          set -euo pipefail
+          PREFIX="$1"
+          REGION="$2"
+          OUT=/etc/portpilot/portpilot.env
+          TMP="$(mktemp)"
+          aws ssm get-parameters-by-path \
+            --path "$PREFIX" \
+            --with-decryption \
+            --recursive \
+            --region "$REGION" \
+            --query "Parameters[].[Name,Value]" \
+            --output text \
+          | while IFS=$'\t' read -r name value; do
+              printf '%s=%s\n' "${!name##*/}" "$value"
+            done > "$TMP"
+          install -m 0640 -o root -g root "$TMP" "$OUT"
+          rm -f "$TMP"
+          LOADER
+          chmod 0755 /usr/local/bin/portpilot-load-config
+          /usr/local/bin/portpilot-load-config "${ParameterPrefix}" "${AWS::Region}"
+
+          # ---- one virtualenv per service, as the repo intends -----------
+          for svc in rescheduling_agent port_ops_agent; do
+            python3.11 -m venv "/opt/portpilot/app/$svc/.venv"
+            "/opt/portpilot/app/$svc/.venv/bin/pip" install --upgrade pip wheel
+            "/opt/portpilot/app/$svc/.venv/bin/pip" install -r "/opt/portpilot/app/$svc/requirements.txt"
+          done
+          /opt/portpilot/app/port_ops_agent/.venv/bin/pip install -e /opt/portpilot/app/port_ops_agent
+
+          useradd --system --home /opt/portpilot --shell /sbin/nologin portpilot || true
+          chown -R portpilot:portpilot /opt/portpilot
+          chown root:portpilot /etc/portpilot/portpilot.env && chmod 0640 /etc/portpilot/portpilot.env
+
+          # ---- systemd units ---------------------------------------------
+          write_unit() {
+            local name="$1" dir="$2" port="$3"
+            cat >"/etc/systemd/system/$name.service" <<UNIT
+          [Unit]
+          Description=PortPilot $name
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=portpilot
+          WorkingDirectory=/opt/portpilot/app/$dir
+          EnvironmentFile=/etc/portpilot/portpilot.env
+          ExecStart=/opt/portpilot/app/$dir/.venv/bin/uvicorn PortPilot.main:app --app-dir src --host 127.0.0.1 --port $port
+          Restart=always
+          RestartSec=5
+          # The rescheduling scheduler must stay single-instance: one worker.
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          }
+          write_unit portpilot-scheduling rescheduling_agent 8000
+          write_unit portpilot-portops port_ops_agent 8001
+
+          # ---- nginx: strip the /api prefixes -----------------------------
+          # Replace the shipped config outright: its own default_server would
+          # otherwise collide with ours on port 80 and win unmatched requests.
+          cat >/etc/nginx/nginx.conf <<'NGINXMAIN'
+          user nginx;
+          worker_processes auto;
+          error_log /var/log/nginx/error.log notice;
+          pid /run/nginx.pid;
+
+          events { worker_connections 1024; }
+
+          http {
+              include /etc/nginx/mime.types;
+              default_type application/octet-stream;
+              log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                              '$status $body_bytes_sent "$http_referer" "$http_user_agent"';
+              access_log /var/log/nginx/access.log main;
+              sendfile on;
+              tcp_nopush on;
+              keepalive_timeout 65;
+              include /etc/nginx/conf.d/*.conf;
+          }
+          NGINXMAIN
+
+          rm -f /etc/nginx/conf.d/*.conf
+
+          cat >/etc/nginx/conf.d/portpilot.conf <<'NGINX'
+          server {
+              listen 80 default_server;
+              server_name _;
+              client_max_body_size 25m;
+
+              location = /healthz {
+                  add_header Content-Type text/plain;
+                  return 200 'ok';
+              }
+
+              location /api/scheduling/ {
+                  proxy_pass http://127.0.0.1:8000/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+                  proxy_read_timeout 120s;
+              }
+
+              location /api/portops/ {
+                  proxy_pass http://127.0.0.1:8001/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+                  proxy_read_timeout 120s;
+              }
+
+              location / { return 404; }
+          }
+          NGINX
+
+          nginx -t
+          systemctl daemon-reload
+          systemctl enable --now nginx portpilot-scheduling portpilot-portops
+
+          echo "PortPilot bootstrap complete"
+
+Outputs:
+  ApiOriginDomain:
+    Description: >
+      Pass this as the ApiOriginDomain parameter of frontend.yaml. Note it
+      changes if the instance is stopped and started again.
+    Value: !GetAtt Instance.PublicDnsName
+
+  HealthCheckUrl:
+    Description: Should return "ok" once the bootstrap finishes (2-4 minutes).
+    Value: !Sub "http://${Instance.PublicDnsName}/healthz"
+
+  InstanceId:
+    Description: "Shell in with: aws ssm start-session --target <this>"
+    Value: !Ref Instance
+
+  BootstrapLogHint:
+    Description: Where to look if a service does not come up.
+    Value: /var/log/portpilot-bootstrap.log
