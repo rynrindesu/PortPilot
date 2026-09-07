@@ -44,7 +44,9 @@ function Drawer({
     >
       <header className="flex items-start justify-between gap-3 border-b border-[var(--color-rail)] px-5 py-4">
         <div>
-          <div className="label">{vessel.vessel_type} · {vessel.flag}</div>
+          <div className="label">
+            {[vessel.vessel_type, vessel.flag].filter(Boolean).join(" · ")}
+          </div>
           <h3 className="display mt-1.5 text-[16px] text-[var(--color-chalk)]">
             {vessel.vessel_name}
           </h3>
@@ -61,7 +63,7 @@ function Drawer({
       <div className="px-5 py-3">
         <KeyVal k="IMO" v={vessel.imo_number} />
         <KeyVal k="Call sign" v={vessel.call_sign} />
-        <KeyVal k="LOA" v={`${vessel.loa_m} m`} />
+        {vessel.loa_m !== null && <KeyVal k="LOA" v={`${vessel.loa_m} m`} />}
         <KeyVal k="From" v={vessel.location_from} mono={false} />
         <KeyVal k="Current ETA" v={stamp(vessel.current_eta)} />
         <KeyVal
@@ -258,7 +260,9 @@ export default function Arrivals() {
                         {v.status === "staged" && <Chip tone="hold">staged</Chip>}
                       </div>
                       <div className="mono text-[9.5px] tracking-[0.06em] text-[var(--color-slate-ink)] uppercase">
-                        {v.vessel_type} · {v.loa_m} m · {v.flag}
+                        {[v.vessel_type, v.loa_m ? `${v.loa_m} m` : null, v.flag]
+                        .filter(Boolean)
+                        .join(" · ")}
                       </div>
                     </td>
                     <td className="mono px-4 py-2.5 text-[11px] text-[var(--color-fog)]">

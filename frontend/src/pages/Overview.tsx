@@ -299,7 +299,7 @@ export default function Overview() {
                           {v.vessel_name}
                         </div>
                         <div className="mono text-[9.5px] tracking-[0.06em] text-[var(--color-slate-ink)] uppercase">
-                          {v.vessel_type}
+                          {v.vessel_type ?? v.flag}
                         </div>
                       </td>
                       <td className="mono px-5 py-2.5 text-[11px] text-[var(--color-fog)]">

@@ -25,7 +25,7 @@ PILOT_DURATION_RANGE_HOURS = (0.5, 2)
 TUG_DURATION_RANGE_MINUTES = (30, 60)
 
 # Berth allocation starts at ETA and varies with vessel turnaround time.
-BERTH_DURATION_RANGE_HOURS = (4, 12)
+BERTH_DURATION_RANGE_HOURS = (1.5, 4)
 
 
 # Check whether a vessel already has an operation of this type.

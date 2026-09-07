@@ -542,7 +542,7 @@ export const PORT_CALLS: PortCallState[] = RECIPES.map((recipe) => {
     v.imo_number,
     v.call_sign,
     v.flag,
-    v.vessel_type,
+    v.vessel_type ?? "Container",
   );
   const compliance: ComplianceResult = {
     status: recipe.complianceStatus,

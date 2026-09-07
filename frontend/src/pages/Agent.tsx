@@ -28,7 +28,10 @@ const ACTOR = {
 function MoveStrip({ option }: { option: ScheduleOption }) {
   const move = option.moves[0];
   if (!move) return null;
-  const shift = deltaMinutes(move.from_start, move.to_start);
+  // A vessel with no prior allocation of this type has nothing to shift from.
+  const shift = move.from_start
+    ? deltaMinutes(move.from_start, move.to_start)
+    : 0;
   return (
     <div className="rounded-[3px] border border-[var(--color-rail)] bg-[color-mix(in_srgb,var(--color-abyss)_60%,transparent)] px-4 py-3.5">
       <div className="flex items-center justify-between">
@@ -55,13 +58,15 @@ function MoveStrip({ option }: { option: ScheduleOption }) {
                   : "text-[var(--color-chalk)]"
               }`}
             >
-              {row.res}
+              {row.res ?? "unassigned"}
             </span>
             <div className="relative h-[7px] flex-1 overflow-hidden rounded-full bg-[var(--color-rail)]">
               <div
                 className="absolute inset-y-0 rounded-full transition-all duration-700"
                 style={{
-                  left: `${((new Date(row.start).getHours() * 60 + new Date(row.start).getMinutes()) / 1440) * 100}%`,
+                  left: row.start
+                    ? `${((new Date(row.start).getHours() * 60 + new Date(row.start).getMinutes()) / 1440) * 100}%`
+                    : "0%",
                   width: "22%",
                   background: row.dim
                     ? "var(--color-mist)"

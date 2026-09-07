@@ -146,7 +146,8 @@ export default function Berths() {
               </div>
               <p className="mt-4 text-[12px] leading-relaxed text-[var(--color-fog)]">
                 {focus.vessel_name} ({focus.imo_number}) inbound from{" "}
-                {focus.location_from}, {focus.loa_m} m LOA. The pilot boards{" "}
+                {focus.location_from}
+                {focus.loa_m ? `, ${focus.loa_m} m LOA` : ""}. The pilot boards{" "}
                 {Math.round(
                   minutesBetween(
                     focus.allocations.pilot!.start_time,

@@ -13,7 +13,7 @@ vessel its schedule.
 
 from collections import deque
 from datetime import datetime, timezone
-from threading import Lock
+from threading import Lock, Thread
 from typing import Any
 
 MAX_RUNS = 200
@@ -202,6 +202,67 @@ def _steps(
     ]
 
 
+def _persist(record: dict) -> None:
+    """Copy a trace into Postgres so it outlives this process.
+
+    Best effort and off the caller's thread: the monitoring path must never
+    slow down, fail, or hold its lock because the audit copy could not be
+    written.
+    """
+
+    def write() -> None:
+        try:
+            import json
+
+            from PortPilot.database.postgres import get_connection
+
+            with get_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO agent_runs (
+                            run_id, vessel_name, imo_number, trigger,
+                            outcome, started_at, duration_ms, payload
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            record.get("run_id"),
+                            record.get("vessel_name"),
+                            record.get("imo_number"),
+                            record.get("trigger"),
+                            record.get("outcome"),
+                            record.get("started_at"),
+                            record.get("duration_ms") or 0,
+                            json.dumps(record, default=str),
+                        ),
+                    )
+        except Exception:
+            pass
+
+    Thread(target=write, name="portpilot-run-log", daemon=True).start()
+
+
+def _load(limit: int) -> list[dict] | None:
+    """Recent traces from Postgres, or None if the store is unavailable."""
+    try:
+        from PortPilot.database.postgres import get_connection
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payload FROM agent_runs
+                    ORDER BY started_at DESC, id DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+                return [row[0] for row in cursor.fetchall()]
+    except Exception:
+        return None
+
+
 class AgentRunLog:
     """Bounded, thread-safe log of recent agent runs, newest first."""
 
@@ -215,9 +276,22 @@ class AgentRunLog:
             self._runs.clear()
             self._seq = 0
 
-    def runs(self) -> list[dict]:
+    def runs(self, limit: int = MAX_RUNS) -> list[dict]:
+        """Newest first.
+
+        Reads the durable copy so traces survive a restart, and falls back to
+        the in-process ring if Postgres is unreachable.
+        """
+        stored = _load(limit)
+        if stored is not None:
+            return stored
         with self._lock:
-            return list(reversed(self._runs))
+            return list(reversed(self._runs))[:limit]
+
+    def _store(self, record: dict) -> None:
+        """Append to the ring and mirror to Postgres. Caller holds the lock."""
+        self._runs.append(record)
+        _persist(record)
 
     def record_eta_change(
         self,
@@ -291,7 +365,7 @@ class AgentRunLog:
 
         with self._lock:
             self._seq += 1
-            self._runs.append(
+            self._store(
                 {
                     "run_id": f"RUN-{self._seq:04d}",
                     "vessel_name": vessel_name,
@@ -330,7 +404,7 @@ class AgentRunLog:
 
         with self._lock:
             self._seq += 1
-            self._runs.append(
+            self._store(
                 {
                     "run_id": f"RUN-{self._seq:04d}",
                     "vessel_name": vessel_name,

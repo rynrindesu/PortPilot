@@ -29,8 +29,9 @@ export interface VesselState {
   flag: string;
   location_from: string;
   location_to: string;
-  vessel_type: string;
-  loa_m: number;
+  /** The OCEANS-X arrival feed carries no vessel particulars. */
+  vessel_type: string | null;
+  loa_m: number | null;
   original_eta: string;
   previous_eta: string | null;
   current_eta: string;
@@ -60,9 +61,10 @@ export interface ScheduleOption {
   score: number;
   moves: {
     resource_type: ResourceType;
-    from_resource: string;
+    /** Null when the vessel had no prior allocation of this type. */
+    from_resource: string | null;
     to_resource: string;
-    from_start: string;
+    from_start: string | null;
     to_start: string;
     to_end: string;
   }[];

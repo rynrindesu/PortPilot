@@ -46,7 +46,7 @@ def normalize_eta(value):
 # pilot, tug, and berth durations use the same ranges as seed data.
 PILOT_DURATION_RANGE_HOURS = (0.5, 2)
 TUG_DURATION_RANGE_MINUTES = (30, 60)
-BERTH_DURATION_RANGE_HOURS = (4, 12)
+BERTH_DURATION_RANGE_HOURS = (1.5, 4)
 DEFAULT_BUFFER_MINUTES = 15
 
 # Time range used to bulk-fetch possible conflicts for a vessel.

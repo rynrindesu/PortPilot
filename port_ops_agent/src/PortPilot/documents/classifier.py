@@ -64,9 +64,21 @@ from openai import OpenAI
 
 load_dotenv()
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+_client = None
+
+
+def _get_client() -> OpenAI:
+    """Build the OpenAI client on first use.
+
+    Constructing it at import time makes the whole service unimportable
+    without OPENAI_API_KEY: uvicorn refuses to boot and pytest cannot even
+    collect. Deferring it means only the code paths that actually call the
+    model need a key.
+    """
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
 
 
 DOCUMENT_TYPES = [
@@ -103,7 +115,7 @@ DOCUMENT:
 {text}
 """
 
-    response = client.responses.create(
+    response = _get_client().responses.create(
         model="gpt-5.6-luna",
         input=prompt,
     )
