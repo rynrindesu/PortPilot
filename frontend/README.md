@@ -44,6 +44,19 @@ and no LLM key. Everything is typed against the real FastAPI payload shapes
 (`PortCallState`, `ExtractedDocument`, `ComplianceResult`, `vessel_state`,
 `schedule_changes`, …) in `src/lib/types.ts`.
 
+### Important: demo display data and backend processing are separate
+
+The deployed demo uses this bundled snapshot for vessel states and the
+document/OCR screens. Its visible arrivals, ETA changes, allocations, document
+extractions, and OCR outcomes are therefore demonstration data, not a live
+operational feed.
+
+The rescheduling backend remains fully functional when it is running with its
+database and OCEANS-X credentials: it independently polls the live OCEANS-X
+arrival feed every hour at `HH:05` (Singapore time), monitors ETA changes, and
+runs the real scheduling, rescheduling, and review pipeline. The demo console
+neither triggers nor replaces that automated backend work.
+
 To read the live services instead, create `frontend/.env.local`:
 
 ```bash

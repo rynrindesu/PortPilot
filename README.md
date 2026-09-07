@@ -176,6 +176,22 @@ python -m pytest -v
 A React console for both services lives in `frontend/`. It ships with a
 bundled operating-day dataset, so it runs with no database and no credentials.
 
+### Demo console versus live backend
+
+The deployed demo console intentionally renders deterministic mock data for
+vessel states and the document/OCR workflow. This keeps the presentation
+repeatable and avoids exposing live operational data or requiring browser-side
+credentials. The mock data is shaped like the real FastAPI responses, so the
+same interface can be pointed at the services when live console access is
+required.
+
+This does **not** make the prototype a mock-only implementation. When the
+rescheduling backend is running with its configured database and OCEANS-X
+credentials, it independently polls the live OCEANS-X arrival feed every hour
+(at `HH:05`, Singapore time), detects ETA changes, and executes the real
+monitoring, scheduling, rescheduling, and review pipeline. The console's demo
+dataset does not drive, replace, or stop that backend automation.
+
 ```bash
 cd frontend
 npm install
