@@ -14,6 +14,7 @@
 [CmdletBinding()]
 param(
     [string]$FrontendStack = "portpilot-console",
+    [string]$LiveConsoleStack = "portpilot-console-live",
     [string]$BackendStack = "portpilot-api",
     [string]$Region = "ap-southeast-1",
     [switch]$KeepParameters
@@ -41,7 +42,29 @@ else {
     Write-Host "$BackendStack not deployed - skipping" -ForegroundColor DarkGray
 }
 
-# --- frontend -----------------------------------------------------------
+# --- live console -------------------------------------------------------
+if (Test-Stack $LiveConsoleStack) {
+    $liveBucket = aws cloudformation describe-stacks `
+        --stack-name $LiveConsoleStack `
+        --region $Region `
+        --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" `
+        --output text
+
+    if ($liveBucket -and $liveBucket -ne "None") {
+        Write-Host "Emptying s3://$($liveBucket.Trim())..." -ForegroundColor Yellow
+        aws s3 rm "s3://$($liveBucket.Trim())" --recursive --region $Region | Out-Null
+    }
+
+    Write-Host "Deleting $LiveConsoleStack..." -ForegroundColor Yellow
+    aws cloudformation delete-stack --stack-name $LiveConsoleStack --region $Region
+    aws cloudformation wait stack-delete-complete --stack-name $LiveConsoleStack --region $Region
+    Write-Host "  gone" -ForegroundColor Green
+}
+else {
+    Write-Host "$LiveConsoleStack not deployed - skipping" -ForegroundColor DarkGray
+}
+
+# --- demo frontend ------------------------------------------------------
 if (Test-Stack $FrontendStack) {
     $bucket = aws cloudformation describe-stacks `
         --stack-name $FrontendStack `

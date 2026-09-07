@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Lock, Play, RefreshCw, Server } from "lucide-react";
 
 import { Button, Chip, KeyVal, Panel, PanelHead, StatusChip } from "../components/ui";
-import { runMonitor } from "../lib/api";
+import { READ_ONLY, runMonitor } from "../lib/api";
 import { hhmm, relative, stamp } from "../lib/format";
 import { useData } from "../lib/store";
 import type { MonitorChange } from "../lib/types";
@@ -215,6 +215,9 @@ export default function Automation() {
           sub={`POST /monitor?arrival_date=${OPERATING_DAY}`}
           accent="var(--color-signal)"
           right={
+            READ_ONLY ? (
+              <Chip tone="mute">read-only deployment</Chip>
+            ) : (
             <Button variant="signal" onClick={trigger} disabled={busy}>
               <span className="inline-flex items-center gap-1.5">
                 {busy ? (
@@ -225,10 +228,19 @@ export default function Automation() {
                 {busy ? "running" : "run monitor"}
               </span>
             </Button>
+            )
           }
         />
         <div className="px-6 py-5">
-          {!changes && (
+          {READ_ONLY && (
+            <p className="text-[12px] leading-relaxed text-[var(--color-fog)]">
+              This deployment exposes the API read-only, so a monitoring pass
+              cannot be started from here. The scheduler still runs it
+              automatically at five past every hour, and every figure on this
+              console is read live from that service.
+            </p>
+          )}
+          {!READ_ONLY && !changes && (
             <p className="text-[12px] leading-relaxed text-[var(--color-fog)]">
               Runs one monitoring cycle against the arrival feed: records new
               vessels, detects ETA revisions and hands each change to the

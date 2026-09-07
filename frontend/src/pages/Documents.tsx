@@ -16,7 +16,7 @@ import {
   Panel,
   PanelHead,
 } from "../components/ui";
-import { PORT_OPS_API, uploadDocument } from "../lib/api";
+import { PORT_OPS_API, READ_ONLY, uploadDocument } from "../lib/api";
 import { relative, titleCase } from "../lib/format";
 import { DOCUMENT_LABELS } from "../lib/mock/portops";
 import { useData } from "../lib/store";
@@ -147,7 +147,10 @@ export default function Documents() {
               }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
-              onClick={() => input.current?.click()}
+              onClick={() => {
+                if (READ_ONLY) return;
+                input.current?.click();
+              }}
               className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[4px] border border-dashed px-6 py-10 text-center transition-colors ${
                 dragging
                   ? "border-[var(--color-signal)] bg-[color-mix(in_srgb,var(--color-signal)_8%,transparent)]"
@@ -161,10 +164,14 @@ export default function Documents() {
               />
               <div>
                 <p className="text-[12.5px] text-[var(--color-chalk)]">
-                  Drop a PDF declaration or certificate
+                  {READ_ONLY
+                    ? "Upload is disabled on this deployment"
+                    : "Drop a PDF declaration or certificate"}
                 </p>
                 <p className="mono mt-1 text-[10px] tracking-[0.1em] text-[var(--color-slate-ink)] uppercase">
-                  or click to browse
+                  {READ_ONLY
+                    ? "documents below were extracted by the live service"
+                    : "or click to browse"}
                 </p>
               </div>
               <input

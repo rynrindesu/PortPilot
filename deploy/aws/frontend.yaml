@@ -32,8 +32,19 @@ Parameters:
       content, no certificate needed on the instance. Leave empty to ship the
       console on its bundled demo dataset.
 
+  ApiAllowWrites:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Whether /api/* accepts mutating requests. Left false, CloudFront serves
+      only GET/HEAD/OPTIONS, so a public audience can read live data without
+      being able to trigger the monitoring cycle - one press of which is
+      several minutes of LLM calls - or upload documents.
+
 Conditions:
   HasApiOrigin: !Not [!Equals [!Ref ApiOriginDomain, ""]]
+  ApiWritesAllowed: !Equals [!Ref ApiAllowWrites, "true"]
 
 Resources:
   # ---------------------------------------------------------------
@@ -129,8 +140,10 @@ Resources:
               TargetOriginId: ApiOrigin
               ViewerProtocolPolicy: https-only
               Compress: true
-              AllowedMethods:
-                [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+              AllowedMethods: !If
+                - ApiWritesAllowed
+                - [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+                - [GET, HEAD, OPTIONS]
               CachedMethods: [GET, HEAD]
               # Managed-CachingDisabled - API responses are per-request state.
               CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad

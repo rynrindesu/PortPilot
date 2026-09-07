@@ -43,6 +43,15 @@ export const LIVE = Boolean(RESCHEDULING_API || PORT_OPS_API);
 
 export const DATA_SOURCE: "demo" | "live" = LIVE ? "live" : "demo";
 
+/**
+ * A public deployment serves the API read-only: CloudFront allows only
+ * GET/HEAD/OPTIONS on /api/*, so a visitor can read the live operating day
+ * but cannot start a monitoring cycle (minutes of LLM calls per press) or
+ * upload documents. The console hides those controls rather than offering
+ * buttons that would fail at the edge.
+ */
+export const READ_ONLY = (env.VITE_API_READ_ONLY ?? "") === "true";
+
 async function get<T>(base: string, path: string, fallback: T): Promise<T> {
   if (!base) return fallback;
 
@@ -114,6 +123,13 @@ export const getResources = () =>
   get<Record<ResourceType, string[]>>(RESCHEDULING_API, "/resources", POOL);
 
 /** POST /monitor/cycle — a real monitoring pass through the agent. */
+export class ReadOnlyError extends Error {
+  constructor() {
+    super("This deployment is read-only.");
+    this.name = "ReadOnlyError";
+  }
+}
+
 export async function runMonitor(processUnconfirmed = false) {
   if (!RESCHEDULING_API) {
     await new Promise((r) => setTimeout(r, 900));
@@ -125,6 +141,8 @@ export async function runMonitor(processUnconfirmed = false) {
       new_eta: r.new_eta,
     }));
   }
+
+  if (READ_ONLY) throw new ReadOnlyError();
 
   const res = await fetch(
     `${RESCHEDULING_API}/monitor/cycle?process_unconfirmed=${processUnconfirmed}`,
@@ -144,6 +162,7 @@ export const getPortCalls = () =>
 /** POST /documents/upload (multipart) — the real extraction service. */
 export async function uploadDocument(file: File) {
   if (!PORT_OPS_API) return null;
+  if (READ_ONLY) throw new ReadOnlyError();
   const body = new FormData();
   body.append("file", file);
   const res = await fetch(`${PORT_OPS_API}/documents/upload`, {
