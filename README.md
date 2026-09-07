@@ -2,6 +2,8 @@
 
 PortPilot is an agentic AI prototype for maritime port-call operations in Singapore.
 
+GitHub Repo Link: https://github.com/rynrindesu/PortPilot
+
 ## Services
 
 PortPilot is being organised as two independent services. They have separate
